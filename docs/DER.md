@@ -1,8 +1,14 @@
 # DER: Argumenta
 
-Versão 0.4, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.5, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.5 (revisão do fundador): **soft delete universal**. Toda tabela
+(18) tem `deleted_at`; a leitura padrão filtra `deleted_at IS NULL` (filtro nos
+repositórios) e **todo UNIQUE vira parcial** com `WHERE deleted_at IS NULL`, para
+que recriar algo apagado (mesmo slug, mesmo token, mesmo alvo) não estoure a
+constraint. O expurgo LGPD continua sendo hard delete.
 
 Mudanças da v0.4 (revisão do fundador): `deleted_at` em `stories`, retirada
 de história sem destruir o histórico dos alunos.
@@ -71,6 +77,7 @@ erDiagram
     boolean is_active "lente ativa, unica por usuario"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   auth_identities {
     uuid id PK
@@ -80,6 +87,7 @@ erDiagram
     text password_hash "argon2, so provider email"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   push_devices {
     uuid id PK
@@ -88,6 +96,7 @@ erDiagram
     text token UK "push token do Expo"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   users ||--o{ user_exam_targets : "mira"
   users ||--o{ auth_identities : "entra por"
@@ -103,7 +112,7 @@ Notas:
   FUVEST 2027 ao mesmo tempo, ou anos diferentes.
 - A **lente ativa** (qual grade apresenta as notas) é o alvo com
   `is_active = true`, garantido único pelo índice parcial
-  `UNIQUE (user_id) WHERE is_active`.
+  `UNIQUE (user_id) WHERE is_active AND deleted_at IS NULL`.
 - Um usuário pode ter as duas identidades (Google e e-mail):
   `UNIQUE (user_id, provider)` e `UNIQUE (provider, provider_subject)`.
 - `push_devices` serve o aplicativo React Native (fase 2): uma linha por
@@ -126,6 +135,7 @@ erDiagram
     text statement "enunciado reescrito"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   stories {
     uuid id PK
@@ -151,6 +161,7 @@ erDiagram
     text portrait_asset
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   chapters {
     uuid id PK
@@ -165,6 +176,7 @@ erDiagram
     text evaluator_brief "o que e argumento viavel aqui"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   chapter_beats {
     uuid id PK
@@ -177,6 +189,7 @@ erDiagram
     text illustration_asset "cena ilustrada"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   themes ||--o{ stories : "inspira"
   stories ||--o{ characters : "tem"
@@ -200,8 +213,10 @@ Notas:
   interlocutor.
 - `stories.deleted_at` é a retirada de catálogo (v0.4): a história some da trilha,
   mas envios, avaliações e progresso dos alunos ficam intactos. Diferente de
-  `status = draft`, que é "ainda não publicada". Capítulos, beats e personagens
-  não precisam do próprio `deleted_at`: seguem o destino da história.
+  `status = draft`, que é "ainda não publicada". Com o soft delete universal da
+  v0.5, capítulos, beats e personagens também têm `deleted_at` próprio para
+  retiradas pontuais; retirar a história esconde a subárvore inteira sem precisar
+  marcar filho a filho.
 
 ## Domínio 3: jogo e avaliação
 
@@ -219,6 +234,7 @@ erDiagram
     smallint paste_count
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   evaluations {
     uuid id PK
@@ -235,6 +251,7 @@ erDiagram
     integer output_tokens
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   evaluation_scores {
     uuid id PK
@@ -245,6 +262,7 @@ erDiagram
     text evidence "citacao do texto que sustenta a nota"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   evaluation_annotations {
     uuid id PK
@@ -258,6 +276,7 @@ erDiagram
     smallint priority "1-3 entra no para passar"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   character_reactions {
     uuid id PK
@@ -270,6 +289,7 @@ erDiagram
     integer output_tokens
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   chapter_progress {
     uuid user_id PK,FK
@@ -281,6 +301,7 @@ erDiagram
     timestamptz passed_at
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   drafts {
     uuid user_id PK,FK
@@ -288,6 +309,7 @@ erDiagram
     text body
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   submissions ||--o{ evaluations : "corrigida por"
   evaluations ||--o{ evaluation_scores : "pontua"
@@ -332,6 +354,7 @@ erDiagram
     smallint approved_count
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   telemetry_events {
     bigint id PK "identity, alto volume"
@@ -341,6 +364,7 @@ erDiagram
     jsonb payload "unico jsonb do modelo"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at
   }
   users ||--o{ daily_activity : "pratica"
   users ||--o{ telemetry_events : "gera"
@@ -378,11 +402,16 @@ Notas:
 
 ## Índices além das PKs/uniques
 
+Convenção da v0.5: **todo UNIQUE do modelo é parcial com `WHERE deleted_at IS
+NULL`** (nos compostos abaixo a condição está implícita), permitindo recriar uma
+linha logicamente apagada sem colisão.
+
 - `user_exam_targets`: `UNIQUE (user_id, exam, year)` e o parcial
-  `UNIQUE (user_id) WHERE is_active` (uma lente ativa por usuário).
+  `UNIQUE (user_id) WHERE is_active AND deleted_at IS NULL` (uma lente ativa por
+  usuário).
 - `submissions (user_id, chapter_id)`: histórico de tentativas do capítulo.
-- `evaluations (submission_id) WHERE is_current`: único parcial, garante uma
-  avaliação corrente por envio.
+- `evaluations (submission_id) WHERE is_current AND deleted_at IS NULL`: único
+  parcial, garante uma avaliação corrente por envio.
 - `evaluation_scores (evaluation_id)` e, para o gráfico de evolução,
   `evaluation_scores (dimension)` combinado com join em `evaluations.created_at`.
 - `telemetry_events (user_id, created_at)`: consultas por aluno e período.
@@ -412,6 +441,12 @@ Notas:
    lembrete de streak chega pelo app React Native. `push_devices` guarda tokens
    opacos do Expo em vez das chaves do protocolo Web Push, e o backend só conversa
    com o serviço de push do Expo.
+8. **Soft delete universal.** Decisão da v0.5: toda tabela tem `deleted_at`,
+   mantido pela aplicação; nenhuma rota de produto faz DELETE físico. A leitura
+   padrão filtra `deleted_at IS NULL` via filtro global nos repositórios, todo
+   UNIQUE é parcial nessa condição, e nas tabelas de PK composta
+   (`chapter_progress`, `daily_activity`, `drafts`) reativar é UPDATE zerando
+   `deleted_at`, não INSERT. Só o expurgo LGPD apaga fisicamente.
 
 ## O que fica fora do banco
 
