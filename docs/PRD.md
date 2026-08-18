@@ -41,12 +41,12 @@ correção instantânea transforma treino em hábito.
 | 11 | Repertório | Avaliação de plausibilidade + alerta pedagógico; fato claramente falso derruba nota |
 | 12 | Anti-cola | Telemetria (colagem, ritmo de digitação) sem bloqueio |
 | 13 | Retenção | Streak diário + gráfico de evolução por dimensão + marcos |
-| 14 | Plataforma | Web mobile-first (PWA); Capacitor para lojas depois; Electron só com demanda real |
+| 14 | Plataforma | Web responsiva no MVP; app React Native (Expo) na fase 2; sem PWA (revisão 2026-08-18) |
 | 15 | Monetização | Beta grátis com limite diário |
 | 16 | Cadastro | Google SSO ou e-mail, coleta mínima (e-mail, apelido, ano do vestibular) |
 | 17 | Corretor | Rubrica estruturada com evidência obrigatória + spellcheck determinístico + suíte de calibração |
 | 18 | Conteúdo MVP | 3 histórias: tutorial + tema ENEM + tema FUVEST (~10 confrontos) |
-| 19 | Stack | FastAPI + Vite/React/TypeScript + Postgres + Claude API |
+| 19 | Stack | FastAPI hexagonal (template python-hexagonal-framework) + Vite/React/TypeScript + Postgres + Claude API |
 | 20 | Métricas de validação | Fora de escopo por decisão do fundador |
 
 ## 4. Loop central
@@ -143,7 +143,7 @@ Na falha técnica, o aluno edita o texto com as anotações à vista.
 - Streak diário (o limite diário de correções reforça o hábito).
 - Gráfico de evolução da nota por dimensão ao longo do tempo.
 - Marcos por história concluída.
-- Push via PWA (Android direto; iOS exige o app instalado na home).
+- Lembrete de streak por push no aplicativo React Native (fase 2); o web não envia push.
 
 ## 9. Contas e dados (LGPD)
 
@@ -161,11 +161,20 @@ e produto.
 
 ## 11. Plataforma e stack
 
-- Web responsiva mobile-first, instalável como PWA. Capacitor para as lojas quando a
-  mecânica validar; Electron somente se surgir demanda real de desktop instalável.
+- Web responsiva mobile-first no MVP. Aplicativo React Native (Expo) na fase 2, no repo
+  `argumenta-mobile`, com push de streak via Expo/FCM/APNs. Sem PWA (revisão de
+  2026-08-18; substitui o plano Capacitor/Electron).
 - Backend: FastAPI (Python), Postgres, Claude API para correção e reações do personagem.
   Suíte de calibração em pytest.
-- Frontend: Vite + React + TypeScript, vite-plugin-pwa.
+- Arquitetura do backend: **hexagonal (ports and adapters) com CQRS na camada de
+  aplicação**, usando o repo
+  [python-hexagonal-framework](https://github.com/mauricio-dalpont/python-hexagonal-framework)
+  como template de estrutura: `domain` (entidades, value objects e serviços de domínio
+  puros, sem framework), `application` (use cases, commands e queries),
+  `adapters` (repositórios SQLAlchemy, cliente Claude, push), `presentation/fastapi`
+  (rotas e schemas) e `entrypoints` (montagem do app). O gerenciador de pacotes segue
+  uv, como já decidido.
+- Frontend: Vite + React + TypeScript.
 - Landing page estática separada no futuro, quando SEO/marketing importar.
 
 ## 12. Telas para o Figma
@@ -184,8 +193,9 @@ e produto.
 ## 13. Fora de escopo do MVP
 
 Dashboard de professor e turmas; billing; ranking e social; detector de IA; apps de
-loja; outros vestibulares (UNICAMP etc.); banco de repertórios; tutor conversacional;
-métricas formais de validação (decisão do fundador).
+loja (planejados para a fase 2 no `argumenta-mobile`); outros vestibulares (UNICAMP
+etc.); banco de repertórios; tutor conversacional; métricas formais de validação
+(decisão do fundador).
 
 ## 14. Riscos e pendências
 
