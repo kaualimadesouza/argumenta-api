@@ -1,8 +1,13 @@
 # DER: Argumenta
 
-Versão 0.2, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.3, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.3: o PWA saiu do plano; o cliente móvel será um aplicativo React
+Native (fase 2, repo `argumenta-mobile`). `push_subscriptions` (Web Push:
+endpoint, p256dh, auth) virou `push_devices` (token de push por dispositivo, via
+Expo/FCM/APNs), com o enum novo `device_platform`.
 
 Mudanças da v0.2 (revisão do fundador): vestibulares alvo viraram uma lista por
 usuário (`user_exam_targets`, com lente ativa), e **toda tabela carrega
@@ -19,7 +24,7 @@ escrevem), **jogo e avaliação** (o que o aluno faz e como o motor corrige) e
 erDiagram
   users ||--o{ auth_identities : "entra por"
   users ||--o{ user_exam_targets : "mira"
-  users ||--o{ push_subscriptions : "recebe"
+  users ||--o{ push_devices : "recebe"
   users ||--o{ submissions : "escreve"
   users ||--o{ chapter_progress : "avanca"
   users ||--o{ drafts : "rascunha"
@@ -73,18 +78,17 @@ erDiagram
     timestamptz created_at
     timestamptz updated_at
   }
-  push_subscriptions {
+  push_devices {
     uuid id PK
     uuid user_id FK
-    text endpoint UK
-    text p256dh
-    text auth
+    device_platform platform "ios ou android"
+    text token UK "push token do Expo"
     timestamptz created_at
     timestamptz updated_at
   }
   users ||--o{ user_exam_targets : "mira"
   users ||--o{ auth_identities : "entra por"
-  users ||--o{ push_subscriptions : "recebe"
+  users ||--o{ push_devices : "recebe"
 ```
 
 Notas:
@@ -99,6 +103,11 @@ Notas:
   `UNIQUE (user_id) WHERE is_active`.
 - Um usuário pode ter as duas identidades (Google e e-mail):
   `UNIQUE (user_id, provider)` e `UNIQUE (provider, provider_subject)`.
+- `push_devices` serve o aplicativo React Native (fase 2): uma linha por
+  dispositivo com o push token do Expo (que roteia para FCM no Android e APNs no
+  iOS). O mesmo aluno pode ter vários aparelhos; `token` é `UNIQUE`; tokens que o
+  provedor recusar no envio (`DeviceNotRegistered`) são apagados. O web não
+  recebe push: sem PWA, lembrete de streak é papel do app.
 - Exclusão de conta: `deleted_at` marca; uma rotina de expurgo apaga as dependentes
   (`ON DELETE CASCADE`) e anonimiza o que precisar ser retido.
 
@@ -346,6 +355,7 @@ Notas:
 |------|---------|----------|
 | `exam` | `enem`, `fuvest` | `user_exam_targets.exam`, `themes.exam` |
 | `auth_provider` | `google`, `email` | `auth_identities.provider` |
+| `device_platform` | `ios`, `android` | `push_devices.platform` |
 | `content_status` | `draft`, `published` | `stories.status` |
 | `chapter_kind` | `confronto`, `chefe` | `chapters.kind` |
 | `branch` | `main`, `consequence`, `recovery` | `chapter_beats.branch` |
@@ -390,6 +400,10 @@ Notas:
    (`updated_at` mantido pela aplicação via `onupdate` do SQLAlchemy). Vestibular
    alvo é lista (`user_exam_targets`) com lente ativa por índice parcial, nunca
    coluna única em `users`.
+7. **Push é do aplicativo, não do navegador.** Decisão da v0.3: sem PWA, o
+   lembrete de streak chega pelo app React Native. `push_devices` guarda tokens
+   opacos do Expo em vez das chaves do protocolo Web Push, e o backend só conversa
+   com o serviço de push do Expo.
 
 ## O que fica fora do banco
 
