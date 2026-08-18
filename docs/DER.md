@@ -1,8 +1,11 @@
 # DER: Argumenta
 
-Versão 0.3, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.4, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.4 (revisão do fundador): `deleted_at` em `stories`, retirada
+de história sem destruir o histórico dos alunos.
 
 Mudanças da v0.3: o PWA saiu do plano; o cliente móvel será um aplicativo React
 Native (fase 2, repo `argumenta-mobile`). `push_subscriptions` (Web Push:
@@ -138,6 +141,7 @@ erDiagram
     content_status status "draft ou published"
     timestamptz created_at
     timestamptz updated_at
+    timestamptz deleted_at "soft delete, historia retirada"
   }
   characters {
     uuid id PK
@@ -194,6 +198,10 @@ Notas:
   `recovery`) é uma sequência ordenada de batidas (narração, fala, objetivo, dica).
 - O antagonista é por capítulo, não por história: capítulos podem trocar o
   interlocutor.
+- `stories.deleted_at` é a retirada de catálogo (v0.4): a história some da trilha,
+  mas envios, avaliações e progresso dos alunos ficam intactos. Diferente de
+  `status = draft`, que é "ainda não publicada". Capítulos, beats e personagens
+  não precisam do próprio `deleted_at`: seguem o destino da história.
 
 ## Domínio 3: jogo e avaliação
 
