@@ -1,8 +1,13 @@
 # DER: Argumenta
 
-Versão 0.1, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.2, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.2 (revisão do fundador): vestibulares alvo viraram uma lista por
+usuário (`user_exam_targets`, com lente ativa), e **toda tabela carrega
+`created_at` e `updated_at`** (o `updated_at` é mantido pela aplicação via
+`onupdate`; os dois aparecem explicitamente nos diagramas).
 
 ## Visão geral
 
@@ -13,6 +18,7 @@ escrevem), **jogo e avaliação** (o que o aluno faz e como o motor corrige) e
 ```mermaid
 erDiagram
   users ||--o{ auth_identities : "entra por"
+  users ||--o{ user_exam_targets : "mira"
   users ||--o{ push_subscriptions : "recebe"
   users ||--o{ submissions : "escreve"
   users ||--o{ chapter_progress : "avanca"
@@ -45,10 +51,18 @@ erDiagram
     uuid id PK
     citext email UK
     text nickname
-    smallint exam_year "ano do vestibular"
-    exam target_exam "lente: enem ou fuvest"
     timestamptz created_at
+    timestamptz updated_at
     timestamptz deleted_at "soft delete LGPD"
+  }
+  user_exam_targets {
+    uuid id PK
+    uuid user_id FK
+    exam exam "enem ou fuvest"
+    smallint year "ano da prova"
+    boolean is_active "lente ativa, unica por usuario"
+    timestamptz created_at
+    timestamptz updated_at
   }
   auth_identities {
     uuid id PK
@@ -57,6 +71,7 @@ erDiagram
     text provider_subject "sub do Google"
     text password_hash "argon2, so provider email"
     timestamptz created_at
+    timestamptz updated_at
   }
   push_subscriptions {
     uuid id PK
@@ -65,15 +80,23 @@ erDiagram
     text p256dh
     text auth
     timestamptz created_at
+    timestamptz updated_at
   }
+  users ||--o{ user_exam_targets : "mira"
   users ||--o{ auth_identities : "entra por"
   users ||--o{ push_subscriptions : "recebe"
 ```
 
 Notas:
 
-- `users` carrega só o mínimo LGPD do PRD: e-mail, apelido, ano de vestibular.
-  Nada de nome completo, CPF, telefone, escola.
+- `users` carrega só o mínimo LGPD do PRD: e-mail e apelido. Nada de nome completo,
+  CPF, telefone, escola.
+- `user_exam_targets` é a lista de vestibulares que o aluno mira: pares
+  (exam, year), com `UNIQUE (user_id, exam, year)`. O aluno pode mirar ENEM 2027 e
+  FUVEST 2027 ao mesmo tempo, ou anos diferentes.
+- A **lente ativa** (qual grade apresenta as notas) é o alvo com
+  `is_active = true`, garantido único pelo índice parcial
+  `UNIQUE (user_id) WHERE is_active`.
 - Um usuário pode ter as duas identidades (Google e e-mail):
   `UNIQUE (user_id, provider)` e `UNIQUE (provider, provider_subject)`.
 - Exclusão de conta: `deleted_at` marca; uma rotina de expurgo apaga as dependentes
@@ -89,6 +112,8 @@ erDiagram
     smallint year
     text title "tema real que caiu"
     text statement "enunciado reescrito"
+    timestamptz created_at
+    timestamptz updated_at
   }
   stories {
     uuid id PK
@@ -111,6 +136,8 @@ erDiagram
     text name
     text persona_brief "voz do personagem para a IA"
     text portrait_asset
+    timestamptz created_at
+    timestamptz updated_at
   }
   chapters {
     uuid id PK
@@ -123,6 +150,8 @@ erDiagram
     smallint min_words
     smallint max_words
     text evaluator_brief "o que e argumento viavel aqui"
+    timestamptz created_at
+    timestamptz updated_at
   }
   chapter_beats {
     uuid id PK
@@ -133,6 +162,8 @@ erDiagram
     uuid character_id FK "so em dialogue"
     text body
     text illustration_asset "cena ilustrada"
+    timestamptz created_at
+    timestamptz updated_at
   }
   themes ||--o{ stories : "inspira"
   stories ||--o{ characters : "tem"
@@ -170,6 +201,7 @@ erDiagram
     integer typing_ms "tempo de escrita"
     smallint paste_count
     timestamptz created_at
+    timestamptz updated_at
   }
   evaluations {
     uuid id PK
@@ -185,6 +217,7 @@ erDiagram
     integer input_tokens
     integer output_tokens
     timestamptz created_at
+    timestamptz updated_at
   }
   evaluation_scores {
     uuid id PK
@@ -193,6 +226,8 @@ erDiagram
     smallint score "0-100"
     boolean passed_floor
     text evidence "citacao do texto que sustenta a nota"
+    timestamptz created_at
+    timestamptz updated_at
   }
   evaluation_annotations {
     uuid id PK
@@ -204,6 +239,8 @@ erDiagram
     text message "explicacao curta"
     text suggestion "forma correta"
     smallint priority "1-3 entra no para passar"
+    timestamptz created_at
+    timestamptz updated_at
   }
   character_reactions {
     uuid id PK
@@ -215,6 +252,7 @@ erDiagram
     text prompt_version
     integer output_tokens
     timestamptz created_at
+    timestamptz updated_at
   }
   chapter_progress {
     uuid user_id PK,FK
@@ -224,11 +262,14 @@ erDiagram
     uuid passing_submission_id FK
     timestamptz unlocked_at
     timestamptz passed_at
+    timestamptz created_at
+    timestamptz updated_at
   }
   drafts {
     uuid user_id PK,FK
     uuid chapter_id PK,FK
     text body
+    timestamptz created_at
     timestamptz updated_at
   }
   submissions ||--o{ evaluations : "corrigida por"
@@ -272,6 +313,8 @@ erDiagram
     date activity_date PK
     smallint submissions_count "limite diario de 3"
     smallint approved_count
+    timestamptz created_at
+    timestamptz updated_at
   }
   telemetry_events {
     bigint id PK "identity, alto volume"
@@ -280,6 +323,7 @@ erDiagram
     text event_type "paste, typing_stats, screen_view"
     jsonb payload "unico jsonb do modelo"
     timestamptz created_at
+    timestamptz updated_at
   }
   users ||--o{ daily_activity : "pratica"
   users ||--o{ telemetry_events : "gera"
@@ -300,7 +344,7 @@ Notas:
 
 | Enum | Valores | Usado em |
 |------|---------|----------|
-| `exam` | `enem`, `fuvest` | `users.target_exam`, `themes.exam` |
+| `exam` | `enem`, `fuvest` | `user_exam_targets.exam`, `themes.exam` |
 | `auth_provider` | `google`, `email` | `auth_identities.provider` |
 | `content_status` | `draft`, `published` | `stories.status` |
 | `chapter_kind` | `confronto`, `chefe` | `chapters.kind` |
@@ -316,6 +360,8 @@ Notas:
 
 ## Índices além das PKs/uniques
 
+- `user_exam_targets`: `UNIQUE (user_id, exam, year)` e o parcial
+  `UNIQUE (user_id) WHERE is_active` (uma lente ativa por usuário).
 - `submissions (user_id, chapter_id)`: histórico de tentativas do capítulo.
 - `evaluations (submission_id) WHERE is_current`: único parcial, garante uma
   avaliação corrente por envio.
@@ -340,6 +386,10 @@ Notas:
    e reação; a suíte de regressão (pytest) referencia essas versões.
 5. **LGPD por construção.** Coleta mínima em `users`, soft delete com expurgo,
    textos do aluno tratados como dado pessoal no expurgo.
+6. **Auditoria universal.** Toda tabela tem `created_at` e `updated_at`
+   (`updated_at` mantido pela aplicação via `onupdate` do SQLAlchemy). Vestibular
+   alvo é lista (`user_exam_targets`) com lente ativa por índice parcial, nunca
+   coluna única em `users`.
 
 ## O que fica fora do banco
 
