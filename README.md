@@ -43,6 +43,25 @@ src/argumenta/
 verificada por contratos do [import-linter](https://import-linter.readthedocs.io/)
 (`make imports`) e roda no CI junto de ruff, mypy (strict) e pytest.
 
+## Autenticação
+
+Duas portas de entrada: cadastro/login por e-mail e senha (hash argon2) e Google
+SSO (authorization code flow), gravando em `users` + `auth_identities`. A sessão
+vive em cookies httpOnly: access token JWT curto (15 min) e refresh token (14
+dias) restrito a `/auth`. Login por e-mail tem rate limit por IP+e-mail.
+Endpoints: `POST /auth/register`, `/auth/login`, `/auth/google`, `/auth/refresh`,
+`/auth/logout`, `GET /me` e gestão de alvos de vestibular em `/me/targets`.
+
+Limitações conhecidas do beta (decisão de produto, sem e-mail transacional):
+
+- Cadastro sem verificação de e-mail e sem fluxo "esqueci a senha"; o caminho de
+  recuperação sugerido é o login com Google.
+- Tokens são stateless: logout limpa os cookies, mas não existe revogação
+  server-side de um token exfiltrado (session store fica para a fase 2).
+
+Google OAuth exige `ARGUMENTA_GOOGLE_CLIENT_ID` e `ARGUMENTA_GOOGLE_CLIENT_SECRET`
+(criados no Google Cloud Console); sem eles o endpoint `/auth/google` responde 502.
+
 ## Releases
 
 Versionamento e changelog são automáticos via

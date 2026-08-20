@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from argumenta.adapters.db.base import AuditMixin, Base, UuidPkMixin, db_enum
-from argumenta.adapters.db.enums import BeatType, Branch, ChapterKind, ContentStatus, Exam
+from argumenta.domain.enums import BeatType, Branch, ChapterKind, ContentStatus, Exam
 
 
 class Theme(UuidPkMixin, AuditMixin, Base):
