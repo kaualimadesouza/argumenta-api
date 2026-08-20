@@ -16,6 +16,7 @@ first; do not improvise the workflow from memory.
 | Deploying, GitHub Actions deploy workflows, VPS, GHCR, rollback | `deploy` |
 | Starting/finishing an issue, opening a PR, the kanban board | `card-workflow` |
 | Adding features, endpoints, use cases, repositories, new modules | `hexagonal-structure` |
+| Reviewing a PR/diff before merge (mandatory for EVERY PR) | `thermo-nuclear-code-quality-review` |
 
 Almost every coding session touches at least `card-workflow` (process) and
 `hexagonal-structure` (where code goes). Load both when implementing a card.
@@ -31,10 +32,17 @@ Almost every coding session touches at least `card-workflow` (process) and
   (`feat:`/`fix:`/`chore:`/`docs:`/`ci:`), body with `Closes #<n>`.
 - Code, identifiers, comments, commit messages and PR descriptions in English.
   Issues and product docs are in Portuguese.
-- Typed objects over dict bags: pydantic models or dataclasses for any function
-  input/output shape.
+- **Objects and ORM, never dicts** (owner decision): every function input/output
+  shape is a dataclass or pydantic model; persistence goes through the SQLAlchemy
+  ORM (no raw SQL rows, no dict payloads between layers). Returning a tuple of
+  loose values is the same smell: give it a named type. The only acceptable dict
+  is a homogeneous lookup map (e.g. `dict[uuid.UUID, ChapterStatus]`) or a
+  short-lived local; a dict-as-record crossing a function boundary is a bug.
 - `make check` (pre-commit pipeline + pytest) must pass before every push; CI runs
-  exactly the same thing.
+  exactly the same thing. Run `git add -A` first: pre-commit only sees tracked files.
+- **Every PR gets a thermo-nuclear review before merge**: run the
+  `thermo-nuclear-code-quality-review` skill over the branch diff, apply or
+  answer every structural finding, and only then merge. Owner decision.
 
 ## Commands
 
