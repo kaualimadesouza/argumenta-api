@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     # auth: HS256 JWT in httpOnly cookies; the default secret only exists so dev
     # and tests boot; prod MUST set ARGUMENTA_JWT_SECRET
-    jwt_secret: str = "dev-only-secret-change-me-before-production"
+    jwt_secret: str = "dev-only-secret-change-me-before-production"  # nosec B105  # pragma: allowlist secret
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 60 * 60 * 24 * 14
     cookie_secure: bool = False

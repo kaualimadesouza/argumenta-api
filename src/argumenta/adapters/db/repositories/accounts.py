@@ -46,17 +46,13 @@ class SqlAlchemyAccountRepository:
 
     def add_email_identity(self, user_id: uuid.UUID, password_hash: str) -> None:
         self._session.add(
-            AuthIdentity(
-                user_id=user_id, provider=AuthProvider.EMAIL, password_hash=password_hash
-            )
+            AuthIdentity(user_id=user_id, provider=AuthProvider.EMAIL, password_hash=password_hash)
         )
         self._session.flush()
 
     def add_google_identity(self, user_id: uuid.UUID, subject: str) -> None:
         self._session.add(
-            AuthIdentity(
-                user_id=user_id, provider=AuthProvider.GOOGLE, provider_subject=subject
-            )
+            AuthIdentity(user_id=user_id, provider=AuthProvider.GOOGLE, provider_subject=subject)
         )
         self._session.flush()
 

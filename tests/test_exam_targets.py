@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 REGISTER = {
     "email": "aluno@example.com",
     "nickname": "Aluno",
-    "password": "correct-horse-9",
+    "password": "correct-horse-9",  # pragma: allowlist secret
     "accepted_terms": True,
 }
 

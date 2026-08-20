@@ -41,9 +41,7 @@ def get_me(user_id: CurrentUserId, accounts: Accounts, targets: Targets) -> MeRe
 
 
 @router.post("/targets", status_code=201)
-def add_target(
-    body: AddTargetRequest, user_id: CurrentUserId, targets: Targets
-) -> TargetResponse:
+def add_target(body: AddTargetRequest, user_id: CurrentUserId, targets: Targets) -> TargetResponse:
     target = AddExamTargetUseCase(targets).execute(
         AddExamTarget(user_id=user_id, exam=body.exam, year=body.year)
     )
@@ -52,9 +50,7 @@ def add_target(
 
 @router.delete("/targets/{target_id}", status_code=204)
 def remove_target(target_id: uuid.UUID, user_id: CurrentUserId, targets: Targets) -> None:
-    RemoveExamTargetUseCase(targets).execute(
-        RemoveExamTarget(user_id=user_id, target_id=target_id)
-    )
+    RemoveExamTargetUseCase(targets).execute(RemoveExamTarget(user_id=user_id, target_id=target_id))
 
 
 @router.put("/targets/{target_id}/activate", status_code=204)

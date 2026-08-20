@@ -4,7 +4,7 @@ import jwt
 from argumenta.domain.accounts import GoogleIdentity
 from argumenta.domain.errors import GoogleSignInFailedError
 
-_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
+_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"  # nosec B105 (URL, not a credential)
 _VALID_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 
 

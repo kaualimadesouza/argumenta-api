@@ -12,7 +12,7 @@ from tests.conftest import FakeGoogleGateway
 REGISTER = {
     "email": "aluno@example.com",
     "nickname": "Aluno",
-    "password": "correct-horse-9",
+    "password": "correct-horse-9",  # pragma: allowlist secret
     "accepted_terms": True,
 }
 
@@ -24,9 +24,7 @@ def _register(client: TestClient, **overrides: object) -> dict[str, object]:
     return dict(response.json())
 
 
-def test_register_creates_user_and_email_identity(
-    client: TestClient, db_engine: Engine
-) -> None:
+def test_register_creates_user_and_email_identity(client: TestClient, db_engine: Engine) -> None:
     body = _register(client)
 
     assert body["email"] == "aluno@example.com"
@@ -34,9 +32,7 @@ def test_register_creates_user_and_email_identity(
     with Session(db_engine) as session:
         user = session.scalar(select(User).where(User.email == "aluno@example.com"))
         assert user is not None
-        identity = session.scalar(
-            select(AuthIdentity).where(AuthIdentity.user_id == user.id)
-        )
+        identity = session.scalar(select(AuthIdentity).where(AuthIdentity.user_id == user.id))
         assert identity is not None
         assert identity.provider == AuthProvider.EMAIL
         assert identity.password_hash is not None
@@ -121,9 +117,7 @@ def test_google_login_is_idempotent_per_subject(
         subject="google-sub-1", email="nova@example.com", email_verified=True
     )
 
-    first = client.post(
-        "/auth/google", json={"code": "any", "redirect_uri": "http://localhost/cb"}
-    )
+    first = client.post("/auth/google", json={"code": "any", "redirect_uri": "http://localhost/cb"})
     second = client.post(
         "/auth/google", json={"code": "any", "redirect_uri": "http://localhost/cb"}
     )
