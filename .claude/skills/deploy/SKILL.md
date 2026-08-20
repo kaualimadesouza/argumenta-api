@@ -41,6 +41,18 @@ gh run watch                                        # follow it
 curl -fsS https://<host>/health                     # verify
 ```
 
+## Migrations run on every deploy (founder decision, 2026-08-20)
+
+The deploy MUST run `alembic upgrade head` before switching traffic to the new
+container: after pulling the new image and before the healthcheck/switch, the
+script runs the migration from the new image
+(`docker run --rm --env-file <env> <image> alembic upgrade head`). A failed
+migration aborts the deploy and keeps the old container serving. Consequence for
+schema work: every migration must be forward-compatible with the container still
+running (expand/contract; never drop or rename a column the live version reads).
+
 Rollback: the script rolls back on failed healthcheck by itself; for a manual
-rollback re-run the workflow pinned to the previous image tag. Never edit
-containers on the VPS by hand; the script owns their lifecycle.
+rollback re-run the workflow pinned to the previous image tag. Migrations are NOT
+rolled back automatically (the old code must tolerate the new schema, see above);
+a manual `alembic downgrade` is the escape hatch. Never edit containers on the
+VPS by hand; the script owns their lifecycle.
