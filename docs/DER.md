@@ -1,8 +1,12 @@
 # DER: Argumenta
 
-Versão 0.5, 2026-08-18. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.6, 2026-08-20. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.6: `users.terms_accepted_at`, o registro do aceite da política de
+privacidade e dos termos de uso no cadastro (LGPD; par do card de política de
+privacidade no argumenta-web).
 
 Mudanças da v0.5 (revisão do fundador): **soft delete universal**. Toda tabela
 (18) tem `deleted_at`; a leitura padrão filtra `deleted_at IS NULL` (filtro nos
@@ -65,6 +69,7 @@ erDiagram
     uuid id PK
     citext email UK
     text nickname
+    timestamptz terms_accepted_at "aceite dos termos no cadastro"
     timestamptz created_at
     timestamptz updated_at
     timestamptz deleted_at "soft delete LGPD"
@@ -107,6 +112,10 @@ Notas:
 
 - `users` carrega só o mínimo LGPD do PRD: e-mail e apelido. Nada de nome completo,
   CPF, telefone, escola.
+- `terms_accepted_at` grava quando o aluno marcou o aceite dos termos e da política
+  de privacidade no cadastro (v0.6). Se os termos mudarem de versão no futuro, a
+  data diz quem precisa re-aceitar; uma tabela de versões de termos só se tornará
+  necessária quando houver mais de uma versão vigente.
 - `user_exam_targets` é a lista de vestibulares que o aluno mira: pares
   (exam, year), com `UNIQUE (user_id, exam, year)`. O aluno pode mirar ENEM 2027 e
   FUVEST 2027 ao mesmo tempo, ou anos diferentes.
