@@ -1,0 +1,29 @@
+name: release-please
+description: |
+  Keeps a release PR open on main, built from conventional commits. Merging the
+  release PR creates the semver tag, the GitHub Release and CHANGELOG.md.
+  Mirrored from the asq-data repo; deploy-on-release jobs arrive with the
+  deploy workflow (issue #3).
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: python
+          token: ${{ secrets.RP_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: .github/release-please-config.json

@@ -1,0 +1,55 @@
+name: Rewrite and Validate PR Title
+description: |
+  Rewrites a PR title in slash format (e.g. feat/new stuff) to the conventional
+  commit format (feat: new stuff) and fails if the result is not conventional.
+  Squash merges use the PR title as the commit subject, which Release Please
+  parses to build versions and changelog.
+
+on:
+  pull_request:
+    types: [opened, edited]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  rewrite-pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rewrite PR title if needed and validate format
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.RP_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.info("No pull request payload found, skipping.");
+              return;
+            }
+            let title = pr.title;
+            core.info(`Original PR title: ${title}`);
+
+            const slashRegex = /^(feat|fix|chore|docs|style|refactor|perf|test|ci)(?:\([^)]+\))?[/](.+)$/i;
+            if (slashRegex.test(title)) {
+              const match = title.match(slashRegex);
+              const type = match[1].toLowerCase();
+              const description = match[2].trim();
+              const newTitle = `${type}: ${description}`;
+              if (newTitle !== title) {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  title: newTitle,
+                });
+                core.info(`PR title updated to: ${newTitle}`);
+                title = newTitle;
+              }
+            }
+
+            const conventionalRegex = /^(feat|fix|chore|docs|style|refactor|perf|test|ci)(?:\([^)]+\))?:\s+.+$/i;
+            if (!conventionalRegex.test(title)) {
+              core.setFailed("PR title is not in the conventional commit format (e.g. 'feat: description'). Please update it.");
+            } else {
+              core.info("PR title is in the conventional commit format.");
+            }

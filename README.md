@@ -43,6 +43,15 @@ src/argumenta/
 verificada por contratos do [import-linter](https://import-linter.readthedocs.io/)
 (`make imports`) e roda no CI junto de ruff, mypy (strict) e pytest.
 
+## Releases
+
+Versionamento e changelog são automáticos via
+[Release Please](https://github.com/googleapis/release-please): todo merge na main
+com conventional commit (`feat:`, `fix:`, ...) alimenta um PR de release; mergear
+esse PR cria a tag semver, a GitHub Release e o `CHANGELOG.md`, propagando a
+versão para `pyproject.toml` e `src/argumenta/__init__.py`. PRs são squash-merged
+com título convencional (validado pelo workflow de título).
+
 ## Documentação
 
 - [PRD](docs/PRD.md): visão, decisões de produto e escopo do MVP.

@@ -1,0 +1,13 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "package-name": "argumenta-api",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "versioning-strategy": "always-bump-patch",
+      "include-v-in-tag": false,
+      "extra-files": ["src/argumenta/__init__.py"]
+    }
+  }
+}
