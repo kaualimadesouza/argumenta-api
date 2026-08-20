@@ -141,9 +141,7 @@ def test_chapter_returns_ordered_main_beats_with_characters(
     assert dialogue["character_name"] == "Dona Marta"
 
 
-def test_locked_chapter_is_forbidden(
-    client: TestClient, seeded: None, db_engine: Engine
-) -> None:
+def test_locked_chapter_is_forbidden(client: TestClient, seeded: None, db_engine: Engine) -> None:
     _register(client)
     client.get("/track")
     with Session(db_engine) as session:
@@ -189,9 +187,7 @@ def test_completing_tutorial_unlocks_next_story(
         ).all()
         for chapter_id in tutorial_chapters:
             session.merge(
-                ChapterProgress(
-                    user_id=user_id, chapter_id=chapter_id, status=ChapterStatus.PASSED
-                )
+                ChapterProgress(user_id=user_id, chapter_id=chapter_id, status=ChapterStatus.PASSED)
             )
         session.commit()
 

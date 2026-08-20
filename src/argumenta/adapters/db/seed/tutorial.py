@@ -60,7 +60,7 @@ def _c1_beats() -> tuple[BeatSeed, ...]:
             Branch.MAIN,
             BeatType.NARRATION,
             "Sexta-feira, 7h20. O aviso no mural ainda tem cheiro de impressora: "
-            "\"FESTIVAL CULTURAL - CANCELADO\". Voce e presidente do gremio ha "
+            '"FESTIVAL CULTURAL - CANCELADO". Voce e presidente do gremio ha '
             "exatamente onze dias.",
         ),
         BeatSeed(
@@ -98,8 +98,8 @@ def _c1_beats() -> tuple[BeatSeed, ...]:
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            "No corredor, o vice do gremio te alcanca: \"Ela deixou uma brecha. "
-            "Disse que se alguem trouxesse um plano de verdade, ela leria.\"",
+            'No corredor, o vice do gremio te alcanca: "Ela deixou uma brecha. '
+            'Disse que se alguem trouxesse um plano de verdade, ela leria."',
         ),
         BeatSeed(
             Branch.RECOVERY,
@@ -133,8 +133,8 @@ def _c2_beats() -> tuple[BeatSeed, ...]:
         BeatSeed(
             Branch.MAIN,
             BeatType.NARRATION,
-            "Dona Marta cedeu, com uma condicao: \"Se o Tenorio topar cuidar da "
-            "estrutura, eu autorizo.\" O zelador esta consertando um portao e nem "
+            'Dona Marta cedeu, com uma condicao: "Se o Tenorio topar cuidar da '
+            'estrutura, eu autorizo." O zelador esta consertando um portao e nem '
             "levanta os olhos quando voce chega.",
         ),
         BeatSeed(
@@ -171,8 +171,8 @@ def _c2_beats() -> tuple[BeatSeed, ...]:
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            "A merendeira, que ouviu tudo, cochicha: \"Ele amoleceu quando o pessoal "
-            "do terceiro ano assinou termo de compromisso pela chave da quadra.\"",
+            'A merendeira, que ouviu tudo, cochicha: "Ele amoleceu quando o pessoal '
+            'do terceiro ano assinou termo de compromisso pela chave da quadra."',
         ),
         BeatSeed(
             Branch.RECOVERY,
@@ -247,7 +247,7 @@ def _c3_beats() -> tuple[BeatSeed, ...]:
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
             "A votacao e adiada em uma semana. Dona Marta segura o seu ombro: "
-            "\"Voce chegou ate aqui. Termine bem.\"",
+            '"Voce chegou ate aqui. Termine bem."',
         ),
         BeatSeed(
             Branch.RECOVERY,
@@ -393,9 +393,7 @@ def seed_tutorial(session: Session) -> bool:
                     branch=beat.branch,
                     position=branch_positions[beat.branch],
                     beat_type=beat.beat_type,
-                    character_id=(
-                        characters[beat.character].id if beat.character else None
-                    ),
+                    character_id=(characters[beat.character].id if beat.character else None),
                     body=beat.body,
                 )
             )

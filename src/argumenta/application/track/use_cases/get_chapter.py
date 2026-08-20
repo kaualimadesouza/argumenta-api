@@ -24,9 +24,7 @@ class GetChapterUseCase:
         chapter = self._content.get_chapter(chapter_id)
         if chapter is None:
             raise ChapterNotFoundError
-        status = self._progress.statuses_for_user(user_id).get(
-            chapter_id, ChapterStatus.LOCKED
-        )
+        status = self._progress.statuses_for_user(user_id).get(chapter_id, ChapterStatus.LOCKED)
         if status == ChapterStatus.LOCKED:
             raise ChapterLockedError
         branch = branch_for_status(status)
