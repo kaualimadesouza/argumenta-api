@@ -6,6 +6,7 @@ from argumenta.domain import errors
 from argumenta.presentation.fastapi.auth import router as auth_router
 from argumenta.presentation.fastapi.health import router as health_router
 from argumenta.presentation.fastapi.me import router as me_router
+from argumenta.presentation.fastapi.track import router as track_router
 
 _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EmailAlreadyRegisteredError: 409,
@@ -15,6 +16,8 @@ _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.ExamTargetAlreadyExistsError: 409,
     errors.ExamTargetNotFoundError: 404,
     errors.TooManyAttemptsError: 429,
+    errors.ChapterNotFoundError: 404,
+    errors.ChapterLockedError: 403,
 }
 
 
@@ -23,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(me_router)
+    app.include_router(track_router)
 
     @app.exception_handler(errors.DomainError)
     async def handle_domain_error(request: Request, exc: errors.DomainError) -> JSONResponse:

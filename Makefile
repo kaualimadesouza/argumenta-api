@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck imports test run check db migrate migration downgrade
+.PHONY: install lint format typecheck imports test run check db migrate migration downgrade seed
 
 install: ; uv sync
 lint: ; uv run ruff check .
@@ -12,3 +12,4 @@ db: ; docker compose up -d db
 migrate: ; uv run alembic upgrade head
 migration: ; uv run alembic revision --autogenerate -m "$(m)"
 downgrade: ; uv run alembic downgrade -1
+seed: ; uv run python -m argumenta.entrypoints.seed_content
