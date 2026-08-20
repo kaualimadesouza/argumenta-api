@@ -16,6 +16,20 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: argumenta
+          POSTGRES_PASSWORD: argumenta # pragma: allowlist secret (throwaway CI container)
+          POSTGRES_DB: argumenta
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U argumenta"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,6 +51,15 @@ jobs:
         run: |
           source .venv/bin/activate
           pre-commit run --all-files
+
+      - name: Migration roundtrip (upgrade, downgrade, upgrade)
+        if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+        run: |
+          source .venv/bin/activate
+          uv run --active alembic upgrade head
+          uv run --active alembic downgrade base
+          uv run --active alembic upgrade head
+          uv run --active alembic check
 
       - name: Run Pytest
         if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
