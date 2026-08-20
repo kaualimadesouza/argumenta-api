@@ -50,3 +50,11 @@ def next_status_for(verdict: Verdict) -> ChapterStatus:
 
 def count_words(text: str) -> int:
     return len(text.split())
+
+
+def start_recovery(status: ChapterStatus) -> ChapterStatus:
+    """The "tentar reverter" action: only makes sense from the consequence
+    scene, and repeating it is harmless (idempotent)."""
+    if status in (ChapterStatus.IN_CONSEQUENCE, ChapterStatus.IN_RECOVERY):
+        return ChapterStatus.IN_RECOVERY
+    raise ChapterNotWritableError(f"recovery is not available from {status.value}")

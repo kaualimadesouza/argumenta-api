@@ -4,13 +4,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from argumenta.application.gameplay.ports import DraftRepository
+from argumenta.application.gameplay.ports import DraftRepository, ProgressWriter
+from argumenta.application.gameplay.use_cases import StartRecoveryUseCase
 from argumenta.application.track.ports import (
     ActivityRepository,
     ContentRepository,
     ProgressRepository,
 )
-from argumenta.application.track.use_cases import GetChapterUseCase, GetTrackUseCase
+from argumenta.application.track.use_cases import (
+    ChapterScript,
+    GetChapterUseCase,
+    GetTrackUseCase,
+)
 from argumenta.domain.enums import BeatType, Branch, ChapterKind, ChapterStatus
 from argumenta.domain.track import StoryState
 from argumenta.presentation.fastapi.dependencies import (
@@ -19,6 +24,7 @@ from argumenta.presentation.fastapi.dependencies import (
     get_content_repository,
     get_draft_repository,
     get_progress_repository,
+    get_progress_writer,
 )
 
 router = APIRouter(tags=["track"])
@@ -27,6 +33,7 @@ Content = Annotated[ContentRepository, Depends(get_content_repository)]
 Progress = Annotated[ProgressRepository, Depends(get_progress_repository)]
 Activity = Annotated[ActivityRepository, Depends(get_activity_repository)]
 Drafts = Annotated[DraftRepository, Depends(get_draft_repository)]
+ProgressW = Annotated[ProgressWriter, Depends(get_progress_writer)]
 
 
 class TrackStoryResponse(BaseModel):
@@ -101,15 +108,7 @@ def get_track(
     )
 
 
-@router.get("/chapters/{chapter_id}")
-def get_chapter(
-    chapter_id: uuid.UUID,
-    user_id: CurrentUserId,
-    content: Content,
-    progress: Progress,
-    drafts: Drafts,
-) -> ChapterResponse:
-    script = GetChapterUseCase(content, progress).execute(user_id, chapter_id)
+def _chapter_response(script: ChapterScript, draft_body: str | None) -> ChapterResponse:
     return ChapterResponse(
         id=script.chapter.id,
         story_id=script.chapter.story_id,
@@ -123,7 +122,7 @@ def get_chapter(
         antagonist_portrait=script.chapter.antagonist_portrait,
         status=script.status,
         branch=script.branch,
-        draft_body=drafts.get(user_id, chapter_id),
+        draft_body=draft_body,
         beats=[
             BeatResponse(
                 beat_type=beat.beat_type,
@@ -135,3 +134,31 @@ def get_chapter(
             for beat in script.beats
         ],
     )
+
+
+@router.get("/chapters/{chapter_id}")
+def get_chapter(
+    chapter_id: uuid.UUID,
+    user_id: CurrentUserId,
+    content: Content,
+    progress: Progress,
+    drafts: Drafts,
+) -> ChapterResponse:
+    script = GetChapterUseCase(content, progress).execute(user_id, chapter_id)
+    return _chapter_response(script, drafts.get(user_id, chapter_id))
+
+
+@router.post("/chapters/{chapter_id}/recovery")
+def start_recovery(
+    chapter_id: uuid.UUID,
+    user_id: CurrentUserId,
+    content: Content,
+    progress: Progress,
+    progress_writer: ProgressW,
+    drafts: Drafts,
+) -> ChapterResponse:
+    """The "tentar reverter" action: moves in_consequence to in_recovery
+    (idempotent) and returns the recovery script in the same call."""
+    StartRecoveryUseCase(progress_writer).execute(user_id, chapter_id)
+    script = GetChapterUseCase(content, progress).execute(user_id, chapter_id)
+    return _chapter_response(script, drafts.get(user_id, chapter_id))

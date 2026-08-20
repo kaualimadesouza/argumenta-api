@@ -46,6 +46,10 @@ class SubmissionRepository(Protocol):
 class ProgressWriter(Protocol):
     def status_of(self, user_id: uuid.UUID, chapter_id: uuid.UUID) -> ChapterStatus: ...
 
+    def set_status(self, user_id: uuid.UUID, chapter_id: uuid.UUID, status: ChapterStatus) -> None:
+        """Plain status move (no attempt accounting), e.g. entering recovery."""
+        ...
+
     def apply_result(
         self,
         user_id: uuid.UUID,

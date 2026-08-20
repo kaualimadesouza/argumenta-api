@@ -152,6 +152,18 @@ class SqlAlchemyProgressWriter:
         )
         return status or ChapterStatus.LOCKED
 
+    def set_status(self, user_id: uuid.UUID, chapter_id: uuid.UUID, status: ChapterStatus) -> None:
+        self._session.execute(
+            update(ChapterProgress)
+            .where(
+                ChapterProgress.user_id == user_id,
+                ChapterProgress.chapter_id == chapter_id,
+                ChapterProgress.deleted_at.is_(None),
+            )
+            .values(status=status)
+        )
+        self._session.flush()
+
     def apply_result(
         self,
         user_id: uuid.UUID,
