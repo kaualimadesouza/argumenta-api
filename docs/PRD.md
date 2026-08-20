@@ -48,6 +48,12 @@ correção instantânea transforma treino em hábito.
 | 18 | Conteúdo MVP | 3 histórias: tutorial + tema ENEM + tema FUVEST (~10 confrontos) |
 | 19 | Stack | FastAPI hexagonal (template python-hexagonal-framework) + Vite/React/TypeScript + Postgres + Claude API |
 | 20 | Métricas de validação | Fora de escopo por decisão do fundador |
+| 21 | Motor LLM | Claude Sonnet (`claude-sonnet-5`); a suíte de calibração decide upgrades de modelo |
+| 22 | Streak | Qualquer envio no dia mantém a sequência, aprovado ou não (prática, não desempenho) |
+| 23 | E-mail transacional | Fora do beta: cadastro sem verificação de e-mail e sem reset por e-mail; Google SSO é o caminho de recuperação |
+| 24 | Custo LLM | Teto mensal configurável com alerta e bloqueio gracioso, medido pelos tokens em `evaluations` |
+| 25 | Ilustrações | Artes paper-cut em SVG no estilo dos mockups até o produto validar; ilustrador humano depois |
+| 26 | Régua inicial | Tutorial piso 40 / média 50; história ENEM 50/60; história FUVEST 55/65; chefe 250 a 450 palavras (calibrar jogando) |
 
 ## 4. Loop central
 
@@ -140,14 +146,18 @@ Na falha técnica, o aluno edita o texto com as anotações à vista.
 
 ## 8. Retenção
 
-- Streak diário (o limite diário de correções reforça o hábito).
+- Streak diário (o limite diário de correções reforça o hábito). Qualquer envio no
+  dia mantém a sequência, aprovado ou não.
 - Gráfico de evolução da nota por dimensão ao longo do tempo.
 - Marcos por história concluída.
 - Lembrete de streak por push no aplicativo React Native (fase 2); o web não envia push.
 
 ## 9. Contas e dados (LGPD)
 
-- Entrada por Google SSO ou cadastro e-mail/senha, à escolha do aluno.
+- Entrada por Google SSO ou cadastro e-mail/senha, à escolha do aluno. No beta o
+  cadastro por e-mail entra sem verificação e sem "esqueci a senha" (não há
+  provedor de e-mail transacional por ora); o Google SSO é o caminho de
+  recuperação sugerido.
 - Coleta mínima: e-mail, apelido, ano de vestibular. Sem nome completo, CPF, telefone ou
   escola.
 - Política de privacidade em linguagem simples; textos do aluno usados apenas para
@@ -212,8 +222,10 @@ Pendências:
 
 - Nome final e domínio.
 - Escala FUVEST exata na lente de apresentação.
-- Valores finais de pisos e médias por trecho da trilha.
-- Professor de redação revisor.
-- Hospedagem (sugestões: Cloudflare Pages para o front, Fly.io ou Railway para o
-  FastAPI, Neon ou Supabase para o Postgres).
-- Identidade visual no Figma.
+- Calibração fina dos pisos e médias jogando (régua inicial proposta na decisão 26).
+- Professor de redação revisor (depois do beta).
+- Hospedagem: decisão adiada. Análise feita em 2026-08-20: VPS recomendada
+  (Oracle Always Free ou Hetzner) mantendo o CI/CD SSH; Cloud Run é a alternativa
+  serverless se largar a administração de máquina compensar; Lambda descartado
+  (carga IO-bound de LLM pune o modelo de cobrança).
+- Política de privacidade e termos de uso com revisão jurídica antes do beta.
