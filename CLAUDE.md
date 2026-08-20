@@ -1,0 +1,58 @@
+# argumenta-api
+
+FastAPI backend of Argumenta: argumentative writing training for vestibular prep
+(FUVEST/ENEM). Hexagonal architecture, Postgres, Claude API as the correction
+engine. Product decisions live in [docs/PRD.md](docs/PRD.md); the database model
+lives in [docs/DER.md](docs/DER.md) and is the source of truth for the schema.
+
+## Skills: check these BEFORE acting
+
+Repo skills live in `.claude/skills/`. If the task matches a row, invoke the skill
+first; do not improvise the workflow from memory.
+
+| If the task involves... | Invoke |
+|---|---|
+| Schema, SQLAlchemy models, Alembic, anything database | `db-migrations` |
+| Deploying, GitHub Actions deploy workflows, VPS, GHCR, rollback | `deploy` |
+| Starting/finishing an issue, opening a PR, the kanban board | `card-workflow` |
+| Adding features, endpoints, use cases, repositories, new modules | `hexagonal-structure` |
+
+Almost every coding session touches at least `card-workflow` (process) and
+`hexagonal-structure` (where code goes). Load both when implementing a card.
+
+## Non-negotiables
+
+- **No assistant attribution anywhere**: no `Co-Authored-By`, no "Generated with"
+  footers, in commits, PRs, issues or comments. Owner decision, permanent.
+- **GitHub account**: `kaualimadesouza` only. Run `gh auth status` before gh/git
+  network operations; `gh auth switch --user kaualimadesouza` if the work account
+  is active (other sessions flip it back).
+- One card = one PR to main, titled as a conventional commit
+  (`feat:`/`fix:`/`chore:`/`docs:`/`ci:`), body with `Closes #<n>`.
+- Code, identifiers, comments, commit messages and PR descriptions in English.
+  Issues and product docs are in Portuguese.
+- Typed objects over dict bags: pydantic models or dataclasses for any function
+  input/output shape.
+- `make check` (pre-commit pipeline + pytest) must pass before every push; CI runs
+  exactly the same thing.
+
+## Commands
+
+```bash
+uv sync            # install (Python 3.12 pinned)
+docker compose up  # Postgres 16 + API on :8000
+make run           # API only, with reload
+make check         # ruff + mypy strict + import contracts + bandit + secrets + xenon + pytest
+```
+
+## Layout (import contracts enforced in CI)
+
+`src/argumenta/{domain, application, adapters, presentation/fastapi, entrypoints}`:
+`domain`/`application` never import FastAPI, SQLAlchemy or outer layers. Details
+and the feature recipe are in the `hexagonal-structure` skill.
+
+## Related
+
+Kanban: GitHub Project "Argumenta MVP" (owner kaualimadesouza, number 2), shared
+with [argumenta-web](https://github.com/kaualimadesouza/argumenta-web) and
+[argumenta-mobile](https://github.com/kaualimadesouza/argumenta-mobile).
