@@ -25,7 +25,9 @@ argumenta-mobile.
 
 1. Move the card to **In Progress** (snippet below).
 2. Branch from main: `feat/<slug>` (or `fix/`, `chore/`).
-3. Implement; `make check` must pass locally (pre-commit pipeline + pytest).
+3. Implement; run `git add -A` BEFORE `make check`: `pre-commit run --all-files`
+   only sees git-tracked files, so an untracked new file silently skips every
+   hook locally and then fails in CI (this bit three PRs in a row).
 4. PR to main titled as a conventional commit, body with `Closes #<n>`.
 5. CI green; after merge, move the card to **Done** (merge auto-closes the issue).
 

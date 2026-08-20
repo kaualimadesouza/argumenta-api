@@ -28,3 +28,11 @@ class ExamTargetNotFoundError(DomainError):
 
 class TooManyAttemptsError(DomainError):
     pass
+
+
+class ChapterNotFoundError(DomainError):
+    pass
+
+
+class ChapterLockedError(DomainError):
+    pass

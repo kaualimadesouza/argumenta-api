@@ -10,6 +10,11 @@ from argumenta.adapters.db.repositories.accounts import (
     SqlAlchemyAccountRepository,
     SqlAlchemyExamTargetRepository,
 )
+from argumenta.adapters.db.repositories.track import (
+    SqlAlchemyActivityRepository,
+    SqlAlchemyContentRepository,
+    SqlAlchemyProgressRepository,
+)
 from argumenta.adapters.db.session import get_session_factory
 from argumenta.adapters.google.oauth import HttpGoogleIdentityGateway
 from argumenta.adapters.security.argon2_hasher import Argon2PasswordHasher
@@ -96,3 +101,15 @@ def get_current_user_id(
 
 
 CurrentUserId = Annotated[uuid.UUID, Depends(get_current_user_id)]
+
+
+def get_content_repository(session: DbSession) -> SqlAlchemyContentRepository:
+    return SqlAlchemyContentRepository(session)
+
+
+def get_progress_repository(session: DbSession) -> SqlAlchemyProgressRepository:
+    return SqlAlchemyProgressRepository(session)
+
+
+def get_activity_repository(session: DbSession) -> SqlAlchemyActivityRepository:
+    return SqlAlchemyActivityRepository(session)
