@@ -25,14 +25,16 @@ argumenta-mobile.
 
 1. Move the card to **In Progress** (snippet below).
 2. Branch from main: `feat/<slug>` (or `fix/`, `chore/`).
-3. Implement; run `git add -A` BEFORE `make check`: `pre-commit run --all-files`
+3. **Tests first**: follow the `tdd` skill (unit tests from domain rules,
+   integration tests from the acceptance criteria, red before green).
+4. Implement; run `git add -A` BEFORE `make check`: `pre-commit run --all-files`
    only sees git-tracked files, so an untracked new file silently skips every
    hook locally and then fails in CI (this bit three PRs in a row).
-4. PR to main titled as a conventional commit, body with `Closes #<n>`.
+5. PR to main titled as a conventional commit, body with `Closes #<n>`.
    Before opening (or at latest before merging), run the
    `thermo-nuclear-code-quality-review` skill over the branch diff and apply
    or explicitly answer every structural finding. No PR merges unreviewed.
-5. CI green; after merge, move the card to **Done** (merge auto-closes the issue).
+6. CI green; after merge, move the card to **Done** (merge auto-closes the issue).
 
 ## Board operations
 
