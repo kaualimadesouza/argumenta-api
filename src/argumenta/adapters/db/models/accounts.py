@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import CITEXT, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from argumenta.adapters.db.base import AuditMixin, Base, UuidPkMixin, db_enum
-from argumenta.adapters.db.enums import AuthProvider, DevicePlatform, Exam
+from argumenta.domain.enums import AuthProvider, DevicePlatform, Exam
 
 
 class User(UuidPkMixin, AuditMixin, Base):

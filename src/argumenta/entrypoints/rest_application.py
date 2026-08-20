@@ -1,12 +1,34 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from argumenta import __version__
+from argumenta.domain import errors
+from argumenta.presentation.fastapi.auth import router as auth_router
 from argumenta.presentation.fastapi.health import router as health_router
+from argumenta.presentation.fastapi.me import router as me_router
+
+_ERROR_STATUS: dict[type[errors.DomainError], int] = {
+    errors.EmailAlreadyRegisteredError: 409,
+    errors.InvalidCredentialsError: 401,
+    errors.TermsNotAcceptedError: 422,
+    errors.GoogleSignInFailedError: 502,
+    errors.ExamTargetAlreadyExistsError: 409,
+    errors.ExamTargetNotFoundError: 404,
+    errors.TooManyAttemptsError: 429,
+}
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Argumenta API", version=__version__)
     app.include_router(health_router)
+    app.include_router(auth_router)
+    app.include_router(me_router)
+
+    @app.exception_handler(errors.DomainError)
+    async def handle_domain_error(request: Request, exc: errors.DomainError) -> JSONResponse:
+        status_code = _ERROR_STATUS.get(type(exc), 400)
+        return JSONResponse(status_code=status_code, content={"detail": type(exc).__name__})
+
     return app
 
 
