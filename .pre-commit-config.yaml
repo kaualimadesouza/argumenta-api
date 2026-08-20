@@ -5,7 +5,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^src/argumenta/adapters/spelling/dictionaries/
       - id: end-of-file-fixer
+        exclude: ^src/argumenta/adapters/spelling/dictionaries/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.1

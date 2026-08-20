@@ -36,3 +36,11 @@ class ChapterNotFoundError(DomainError):
 
 class ChapterLockedError(DomainError):
     pass
+
+
+class LlmBudgetExceededError(DomainError):
+    pass
+
+
+class EvaluationFailedError(DomainError):
+    pass
