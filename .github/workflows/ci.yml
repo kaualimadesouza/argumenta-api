@@ -1,21 +1,47 @@
-name: ci
+name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          enable-cache: true
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy
-      - run: uv run lint-imports
-      - run: uv run pytest
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv venv --python=python3.12
+          uv sync
+
+      - name: Run pre-commit
+        run: |
+          source .venv/bin/activate
+          pre-commit run --all-files
+
+      - name: Run Pytest
+        if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+        env:
+          TERM: dumb
+        run: |
+          source .venv/bin/activate
+          uv run --active pytest

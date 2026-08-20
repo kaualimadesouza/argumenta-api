@@ -7,4 +7,4 @@ typecheck: ; uv run mypy
 imports: ; uv run lint-imports
 test: ; uv run pytest
 run: ; uv run uvicorn argumenta.entrypoints.rest_application:app --reload
-check: lint typecheck imports test
+check: ; uv run pre-commit run --all-files && uv run pytest

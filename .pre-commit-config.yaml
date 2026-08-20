@@ -1,7 +1,66 @@
+# Pre-commit is the lint pipeline: CI runs `pre-commit run --all-files`.
+# Mirrors the asq-data setup, adapted to a single-project repo.
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.12.1
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff
+        entry: ruff
+        args: ["check", "--fix", "."]
+        language: python
+        types_or: [python, pyi]
+        exclude: ^migrations/
+      - id: ruff
+        name: ruff-imports
+        entry: ruff
+        args: ["check", "--select", "I", "--fix", "."]
+        language: python
+        types_or: [python, pyi]
+        exclude: ^migrations/
       - id: ruff-format
+        name: ruff-format
+        exclude: ^migrations/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict, config in pyproject)
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+      - id: import-linter
+        name: import contracts (hexagonal layers)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.5
+    hooks:
+      - id: bandit
+        args: ["--exclude", "tests/,test_*,*tests.py"]
+        exclude: ^(migrations/|.*/migrations/|tests/)
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: uv\.lock
+
+  - repo: https://github.com/rubik/xenon
+    rev: v0.9.1
+    hooks:
+      - id: xenon
+        name: Check code complexity
+        # Ranks: A (1-5), B (6-10), C (11-20), D (21-30), E (31-40), F (41+)
+        args: ["--max-absolute", "B", "--max-modules", "B", "--max-average", "B"]
+        exclude: ^(migrations/|.*tests?/.*|.*test.*\.py)
