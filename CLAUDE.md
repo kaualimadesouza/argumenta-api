@@ -16,6 +16,7 @@ first; do not improvise the workflow from memory.
 | Deploying, GitHub Actions deploy workflows, VPS, GHCR, rollback | `deploy` |
 | Starting/finishing an issue, opening a PR, the kanban board | `card-workflow` |
 | Adding features, endpoints, use cases, repositories, new modules | `hexagonal-structure` |
+| Writing ANY code (tests come first) | `tdd` |
 | Reviewing a PR/diff before merge (mandatory for EVERY PR) | `thermo-nuclear-code-quality-review` |
 
 Almost every coding session touches at least `card-workflow` (process) and
@@ -40,6 +41,14 @@ Almost every coding session touches at least `card-workflow` (process) and
   short-lived local; a dict-as-record crossing a function boundary is a bug.
 - `make check` (pre-commit pipeline + pytest) must pass before every push; CI runs
   exactly the same thing. Run `git add -A` first: pre-commit only sees tracked files.
+- **TDD, always** (owner decision, details in the `tdd` skill): write the tests
+  BEFORE the implementation.
+  For each card: unit tests for the domain rules and integration tests derived
+  from the acceptance criteria come first; watch them fail (red), implement
+  until green, then refactor with the suite as the safety net. A bug found
+  later gets a failing regression test before the fix. Tests assert behavior
+  through the public surface (endpoints, use cases, domain functions), never
+  implementation details.
 - **Every PR gets a thermo-nuclear review before merge**: run the
   `thermo-nuclear-code-quality-review` skill over the branch diff, apply or
   answer every structural finding, and only then merge. Owner decision.

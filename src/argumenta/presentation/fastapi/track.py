@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from argumenta.application.gameplay.ports import DraftRepository
 from argumenta.application.track.ports import (
     ActivityRepository,
     ContentRepository,
@@ -16,6 +17,7 @@ from argumenta.presentation.fastapi.dependencies import (
     CurrentUserId,
     get_activity_repository,
     get_content_repository,
+    get_draft_repository,
     get_progress_repository,
 )
 
@@ -24,6 +26,7 @@ router = APIRouter(tags=["track"])
 Content = Annotated[ContentRepository, Depends(get_content_repository)]
 Progress = Annotated[ProgressRepository, Depends(get_progress_repository)]
 Activity = Annotated[ActivityRepository, Depends(get_activity_repository)]
+Drafts = Annotated[DraftRepository, Depends(get_draft_repository)]
 
 
 class TrackStoryResponse(BaseModel):
@@ -67,6 +70,7 @@ class ChapterResponse(BaseModel):
     antagonist_portrait: str | None
     status: ChapterStatus
     branch: Branch
+    draft_body: str | None
     beats: list[BeatResponse]
 
 
@@ -99,7 +103,11 @@ def get_track(
 
 @router.get("/chapters/{chapter_id}")
 def get_chapter(
-    chapter_id: uuid.UUID, user_id: CurrentUserId, content: Content, progress: Progress
+    chapter_id: uuid.UUID,
+    user_id: CurrentUserId,
+    content: Content,
+    progress: Progress,
+    drafts: Drafts,
 ) -> ChapterResponse:
     script = GetChapterUseCase(content, progress).execute(user_id, chapter_id)
     return ChapterResponse(
@@ -115,6 +123,7 @@ def get_chapter(
         antagonist_portrait=script.chapter.antagonist_portrait,
         status=script.status,
         branch=script.branch,
+        draft_body=drafts.get(user_id, chapter_id),
         beats=[
             BeatResponse(
                 beat_type=beat.beat_type,

@@ -44,3 +44,15 @@ class LlmBudgetExceededError(DomainError):
 
 class EvaluationFailedError(DomainError):
     pass
+
+
+class ChapterNotWritableError(DomainError):
+    pass
+
+
+class WordCountOutOfRangeError(DomainError):
+    pass
+
+
+class DailyLimitReachedError(DomainError):
+    pass
