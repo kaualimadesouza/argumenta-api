@@ -23,6 +23,13 @@ from argumenta.domain.evaluation import (
 )
 
 RULER = EvaluationRuler(dimension_floor=40, min_average=50)
+BASE_DIMENSIONS = (
+    Dimension.NORMA_CULTA,
+    Dimension.COESAO,
+    Dimension.COERENCIA,
+    Dimension.REPERTORIO,
+    Dimension.PERSUASAO,
+)
 
 
 def _scores(**by_dimension: int) -> tuple[DimensionScore, ...]:
@@ -76,14 +83,7 @@ class TestVerdictRule:
 class TestEngineOutputContract:
     PAYLOAD: ClassVar[dict[str, Any]] = {
         "scores": [
-            {"dimension": d.value, "score": 80, "evidence": "trecho"}
-            for d in (
-                Dimension.NORMA_CULTA,
-                Dimension.COESAO,
-                Dimension.COERENCIA,
-                Dimension.REPERTORIO,
-                Dimension.PERSUASAO,
-            )
+            {"dimension": d.value, "score": 80, "evidence": "trecho"} for d in BASE_DIMENSIONS
         ],
         "annotations": [
             {
@@ -99,7 +99,7 @@ class TestEngineOutputContract:
     }
 
     def test_valid_payload_parses(self) -> None:
-        output = parse_engine_output(self.PAYLOAD, "algo escrito pelo aluno")
+        output = parse_engine_output(self.PAYLOAD, "algo escrito pelo aluno", BASE_DIMENSIONS)
         assert len(output.scores) == 5
         assert output.annotations[0].type == AnnotationType.SPELLING
         assert output.annotations[0].severity == Severity.ERROR
@@ -107,21 +107,30 @@ class TestEngineOutputContract:
     def test_missing_dimension_is_rejected(self) -> None:
         payload = {**self.PAYLOAD, "scores": self.PAYLOAD["scores"][:4]}
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output(payload, "texto")
+            parse_engine_output(payload, "texto", BASE_DIMENSIONS)
+
+    def test_the_five_base_dimensions_do_not_satisfy_a_boss_request(self) -> None:
+        """The boss essay under the ENEM lens asks for one dimension more."""
+        with pytest.raises(EvaluationFailedError):
+            parse_engine_output(
+                self.PAYLOAD,
+                "algo escrito pelo aluno",
+                (*BASE_DIMENSIONS, Dimension.PROPOSTA_INTERVENCAO),
+            )
 
     def test_score_out_of_range_is_rejected(self) -> None:
         bad = [{**s, "score": 150} for s in self.PAYLOAD["scores"]]
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto")
+            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto", BASE_DIMENSIONS)
 
     def test_span_outside_text_is_rejected(self) -> None:
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output(self.PAYLOAD, "abc")
+            parse_engine_output(self.PAYLOAD, "abc", BASE_DIMENSIONS)
 
     def test_empty_evidence_is_rejected(self) -> None:
         bad = [{**s, "evidence": ""} for s in self.PAYLOAD["scores"]]
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto")
+            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto", BASE_DIMENSIONS)
 
 
 class FakeEngine:
@@ -156,7 +165,9 @@ class FakeBudget:
             raise LlmBudgetExceededError
 
 
-def _request() -> EvaluateArgument:
+def _request(
+    required: tuple[Dimension, ...] = BASE_DIMENSIONS, full_essay: bool = False
+) -> EvaluateArgument:
     return EvaluateArgument(
         text="A escola presisa do festival.",
         chapter_objective="Convencer a diretora.",
@@ -165,6 +176,8 @@ def _request() -> EvaluateArgument:
         min_words=120,
         max_words=250,
         ruler=RULER,
+        required_dimensions=required,
+        full_essay=full_essay,
     )
 
 
@@ -198,3 +211,31 @@ class TestEvaluateArgumentUseCase:
         with pytest.raises(LlmBudgetExceededError):
             use_case.execute(_request())
         assert engine.last_request is None
+
+    def test_boss_request_carries_the_essay_rule_and_the_extra_dimension(self) -> None:
+        required = (*BASE_DIMENSIONS, Dimension.PROPOSTA_INTERVENCAO)
+        engine = FakeEngine(
+            (
+                *_scores(),
+                DimensionScore(
+                    dimension=Dimension.PROPOSTA_INTERVENCAO, score=70, evidence="proposta"
+                ),
+            )
+        )
+        use_case = EvaluateArgumentUseCase(engine, FakeSpellChecker(), FakeBudget())
+
+        outcome = use_case.execute(_request(required=required, full_essay=True))
+
+        assert engine.last_request is not None
+        assert engine.last_request.full_essay is True
+        assert engine.last_request.required_dimensions == required
+        assert len(outcome.scores) == 6
+
+    def test_engine_that_ignores_a_required_dimension_is_rejected(self) -> None:
+        """Any engine, not just the Claude adapter: an incomplete correction
+        would silently distort the exam lens."""
+        engine = FakeEngine(_scores())
+        use_case = EvaluateArgumentUseCase(engine, FakeSpellChecker(), FakeBudget())
+
+        with pytest.raises(EvaluationFailedError):
+            use_case.execute(_request(required=(*BASE_DIMENSIONS, Dimension.PROPOSTA_INTERVENCAO)))

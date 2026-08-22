@@ -6,7 +6,9 @@ from anthropic.types import ToolChoiceToolParam, ToolParam
 from pydantic import BaseModel, Field, ValidationError
 
 from argumenta.adapters.llm.prompts.evaluation_v1 import (
+    FULL_ESSAY_RULE,
     PROMPT_VERSION,
+    SCENE_TEXT_RULE,
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
@@ -15,13 +17,16 @@ from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
 from argumenta.domain.evaluation import Annotation, DimensionScore
 
-_REQUIRED_DIMENSIONS = (
-    Dimension.NORMA_CULTA,
-    Dimension.COESAO,
-    Dimension.COERENCIA,
-    Dimension.REPERTORIO,
-    Dimension.PERSUASAO,
-)
+_DIMENSION_BRIEFS: dict[Dimension, str] = {
+    Dimension.NORMA_CULTA: "ortografia, acentuacao, pontuacao, concordancia e regencia",
+    Dimension.COESAO: "conectivos, retomadas e encadeamento entre frases e paragrafos",
+    Dimension.COERENCIA: "logica interna, progressao e adequacao ao objetivo da cena",
+    Dimension.REPERTORIO: "conhecimento externo explicado e conectado a tese",
+    Dimension.PERSUASAO: "forca argumentativa dentro do contexto da cena",
+    Dimension.PROPOSTA_INTERVENCAO: (
+        "proposta de intervencao completa: acao, agente, meio, finalidade e detalhamento"
+    ),
+}
 
 
 class ScoreOutput(BaseModel):
@@ -58,16 +63,18 @@ def _tool_definition() -> ToolParam:
     )
 
 
-def parse_engine_output(payload: dict[str, Any], text: str) -> EvaluationOutput:
-    """Validate the tool payload: pydantic contract, one score per dimension,
-    spans inside the text. Raises EvaluationFailedError on violations."""
+def parse_engine_output(
+    payload: dict[str, Any], text: str, required: tuple[Dimension, ...]
+) -> EvaluationOutput:
+    """Validate the tool payload: pydantic contract, one score per required
+    dimension, spans inside the text. Raises EvaluationFailedError."""
     try:
         output = EvaluationOutput.model_validate(payload)
     except ValidationError as error:
         raise EvaluationFailedError(f"engine output rejected: {error}") from error
 
     seen = {score.dimension for score in output.scores}
-    if seen != set(_REQUIRED_DIMENSIONS) or len(output.scores) != len(_REQUIRED_DIMENSIONS):
+    if seen != set(required) or len(output.scores) != len(required):
         raise EvaluationFailedError(f"engine must score each dimension exactly once, got {seen}")
 
     for annotation in output.annotations:
@@ -85,6 +92,12 @@ def _format_anchors(request: EngineRequest) -> str:
     return "\n".join(
         f'- "{anchor.word}" em [{anchor.span_start}, {anchor.span_end})'
         for anchor in request.spelling_anchors
+    )
+
+
+def _format_dimensions(required: tuple[Dimension, ...]) -> str:
+    return "\n".join(
+        f"- {dimension.value}: {_DIMENSION_BRIEFS[dimension]}" for dimension in required
     )
 
 
@@ -116,6 +129,8 @@ class ClaudeEvaluationEngine:
                             min_words=request.min_words,
                             max_words=request.max_words,
                             anchors=_format_anchors(request),
+                            dimensions=_format_dimensions(request.required_dimensions),
+                            format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
                             text=request.text,
                         ),
                     }
@@ -130,7 +145,7 @@ class ClaudeEvaluationEngine:
         )
         if not isinstance(payload, dict):
             raise EvaluationFailedError("engine returned no tool_use block")
-        output = parse_engine_output(payload, request.text)
+        output = parse_engine_output(payload, request.text, request.required_dimensions)
 
         return EngineResult(
             scores=tuple(
