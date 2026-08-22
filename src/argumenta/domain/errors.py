@@ -56,3 +56,7 @@ class WordCountOutOfRangeError(DomainError):
 
 class DailyLimitReachedError(DomainError):
     pass
+
+
+class SubmissionNotFoundError(DomainError):
+    pass
