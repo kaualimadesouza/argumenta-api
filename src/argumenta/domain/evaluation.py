@@ -7,6 +7,7 @@ same scores and ruler always produce the same verdict (PRD reliability rule).
 from dataclasses import dataclass
 
 from argumenta.domain.enums import AnnotationType, Dimension, Severity, Verdict
+from argumenta.domain.errors import EvaluationFailedError
 
 BASE_DIMENSIONS = (
     Dimension.NORMA_CULTA,
@@ -127,3 +128,16 @@ def _verdict_for(failed: list[Dimension], average: float, ruler: EvaluationRuler
     if failed or average < ruler.min_average:
         return Verdict.FAILED_PERSUASION
     return Verdict.APPROVED
+
+
+def ensure_graded_exactly(
+    scores: tuple[DimensionScore, ...], required: tuple[Dimension, ...]
+) -> None:
+    """Holds for every engine, not just the Claude adapter: a correction missing
+    a required dimension, or answering one twice, would silently distort the
+    verdict and the lens. Raises EvaluationFailedError."""
+    graded = {score.dimension for score in scores}
+    if len(scores) != len(required) or graded != set(required):
+        raise EvaluationFailedError(
+            f"engine graded {sorted(graded)}, expected {sorted(set(required))}"
+        )

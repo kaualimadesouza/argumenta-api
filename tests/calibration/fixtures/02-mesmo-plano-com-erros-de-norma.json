@@ -1,0 +1,19 @@
+{
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "confronto",
+  "exam": "enem",
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "spelling_anchors": 17,
+  "expected": {
+    "norma_culta": 30,
+    "coesao": 80,
+    "coerencia": 82,
+    "repertorio": 72,
+    "persuasao": 85
+  },
+  "text": "Dona Marta, eu entendo que o festival do ano pasado terminou com a quadra suja e com duas reclamaçoes dos vizinho. É por isso que eu trago um plano e não so um pedido. Nos propoe tres turno de limpeza com escala asinada por vinte aluno, encerramento as vinte e duas hora e um responsavel adulto por setor, o professor de educação fisica ja aceitou coordenar a divisão. O que aconteçe em outras escola mostra que o problema não é o evento e sim a falta de combinado escrito. Numa escola do bairro vizinho o gremio pasou a registra em ata quem responde por cada etapa e as reclamaçoes caiu para zero em duas ediçoes. Se a senhora autoriza, eu entrego a ata antes do festival e assumo a devoluçao da quadra limpa. Se nos falha em algum item o festival do proximo semestre não acontece e isso fica escrito tambem."
+}
