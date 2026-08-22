@@ -86,10 +86,36 @@ def derive_story_state(
 
 
 @dataclass(frozen=True)
+class ChapterCursor:
+    """Where the student is inside a story, and what the CTA has to open."""
+
+    id: uuid.UUID
+    order: int
+    """1-based place in the story, which is what the screen counts ("Cap. 2/5")."""
+    status: ChapterStatus
+
+
+@dataclass(frozen=True)
 class StoryProgress:
     story: StorySummary
     state: StoryState
     chapters_passed: int
+    current_chapter: ChapterCursor | None
+    """None when there is nothing to open: story finished, or still locked."""
+
+
+def _cursor(
+    story: StorySummary,
+    progress: dict[uuid.UUID, ChapterStatus],
+    state: StoryState,
+) -> ChapterCursor | None:
+    if state in (StoryState.LOCKED, StoryState.COMPLETED):
+        return None
+    for order, chapter_id in enumerate(story.chapter_ids, start=1):
+        status = progress.get(chapter_id, ChapterStatus.LOCKED)
+        if status != ChapterStatus.PASSED:
+            return ChapterCursor(id=chapter_id, order=order, status=status)
+    return None
 
 
 def fold_stories(
@@ -111,6 +137,7 @@ def fold_stories(
                     for chapter_id in story.chapter_ids
                     if progress.get(chapter_id) == ChapterStatus.PASSED
                 ),
+                current_chapter=_cursor(story, progress, state),
             )
         )
         previous_completed = state == StoryState.COMPLETED

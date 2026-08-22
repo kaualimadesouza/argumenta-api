@@ -72,7 +72,3 @@ class TelemetryBatchTooLargeError(DomainError):
 
 class TelemetryTimestampError(DomainError):
     pass
-
-
-class AccountNotFoundError(DomainError):
-    pass
