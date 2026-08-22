@@ -1,0 +1,19 @@
+{
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "confronto",
+  "exam": "enem",
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "spelling_anchors": 0,
+  "expected": {
+    "norma_culta": 85,
+    "coesao": 70,
+    "coerencia": 65,
+    "repertorio": 25,
+    "persuasao": 40
+  },
+  "text": "Dona Marta, o festival do grêmio deve ser liberado porque cultura é fundamental na formação de qualquer cidadão. Desde os tempos antigos, a humanidade se expressa por meio da arte, e a escola não pode ficar de fora desse processo tão importante para o desenvolvimento dos jovens. Sabemos que a educação vai muito além do conteúdo das provas e que o aluno precisa ser preparado para a vida em sociedade, com valores como respeito, união e responsabilidade. O festival é exatamente esse espaço de aprendizado, no qual todos crescem juntos e aprendem a conviver com as diferenças. Além disso, um ambiente escolar mais alegre motiva os estudantes e melhora o relacionamento entre alunos e professores. Por todos esses motivos, acredito sinceramente que autorizar o evento seria uma decisão acertada e coerente com o papel transformador que a educação exerce na vida de cada um de nós."
+}

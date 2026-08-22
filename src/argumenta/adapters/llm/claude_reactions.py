@@ -1,5 +1,6 @@
 import anthropic
 
+from argumenta.adapters.llm.contract import Effort, ensure_usable
 from argumenta.adapters.llm.prompts.reaction_v1 import (
     CONVINCED_INSTRUCTION,
     PROMPT_VERSION,
@@ -13,13 +14,22 @@ from argumenta.domain.errors import EvaluationFailedError
 
 
 class ClaudeReactionEngine:
-    """Free-text generation, mild temperature: the reaction is performance,
-    not judgement (the verdict was already decided by the evaluation engine)."""
+    """Free text: the reaction is performance, not judgement (the verdict was
+    already decided by the evaluation engine). Low effort and a budget with
+    room to spare, because thinking comes out of max_tokens and a truncated
+    reaction is an empty one."""
 
-    def __init__(self, api_key: str, model: str, max_tokens: int = 400) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        max_tokens: int = 1500,
+        effort: Effort = "low",
+    ) -> None:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
         self._max_tokens = max_tokens
+        self._effort = effort
 
     def generate(self, request: ReactionRequest) -> ReactionText:
         instruction = (
@@ -29,7 +39,7 @@ class ClaudeReactionEngine:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=self._max_tokens,
-                temperature=0.7,
+                output_config={"effort": self._effort},
                 system=SYSTEM_PROMPT,
                 messages=[
                     {
@@ -47,6 +57,7 @@ class ClaudeReactionEngine:
         except anthropic.AnthropicError as error:
             raise EvaluationFailedError(str(error)) from error
 
+        ensure_usable(response.stop_reason, self._max_tokens)
         body = "".join(block.text for block in response.content if block.type == "text").strip()
         if not body:
             raise EvaluationFailedError("reaction engine returned no text")

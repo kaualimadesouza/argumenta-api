@@ -6,13 +6,11 @@ from argumenta.application.evaluation.ports import (
     LlmBudget,
     SpellChecker,
 )
-from argumenta.domain.enums import Dimension
-from argumenta.domain.errors import EvaluationFailedError
 from argumenta.domain.evaluation import (
-    DimensionScore,
     EvaluationOutcome,
     EvaluationRuler,
     decide_verdict,
+    ensure_graded_exactly,
 )
 from argumenta.domain.lenses import GradingSpec
 
@@ -62,7 +60,7 @@ class EvaluateArgumentUseCase:
                 full_essay=request.spec.full_essay,
             )
         )
-        self._ensure_complete(result.scores, request.spec.dimensions)
+        ensure_graded_exactly(result.scores, request.spec.dimensions)
         decision = decide_verdict(result.scores, request.ruler)
         return EvaluationOutcome(
             verdict=decision.verdict,
@@ -75,15 +73,3 @@ class EvaluateArgumentUseCase:
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
         )
-
-    @staticmethod
-    def _ensure_complete(
-        scores: tuple[DimensionScore, ...], required: tuple[Dimension, ...]
-    ) -> None:
-        """Holds for every engine, not just the Claude adapter: a correction
-        missing a required dimension would silently distort the lens."""
-        graded = {score.dimension for score in scores}
-        if len(scores) != len(required) or graded != set(required):
-            raise EvaluationFailedError(
-                f"engine graded {sorted(graded)}, expected {sorted(set(required))}"
-            )

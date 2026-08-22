@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from argumenta.adapters.llm.effort import Effort
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ARGUMENTA_", env_file=".env", extra="ignore")
@@ -21,9 +23,13 @@ class Settings(BaseSettings):
     # evaluation engine (issue #7): Claude with structured output, temp 0
     anthropic_api_key: str = ""
     evaluation_model: str = "claude-sonnet-5"
+    # thinking effort of the graded correction; "high" is the API default, and
+    # changing it moves every score, so the calibration workflow watches this file
+    evaluation_effort: Effort = "high"
     # character reaction (issue #10): free text, own knob so the flavour beat can
     # move to a cheaper model without touching the graded correction
     reaction_model: str = "claude-sonnet-5"
+    reaction_effort: Effort = "low"
     # monthly LLM cap in tokens over evaluations + character_reactions; 0 disables
     llm_monthly_token_budget: int = 10_000_000
     llm_budget_alert_ratio: float = 0.8

@@ -1,0 +1,19 @@
+{
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "confronto",
+  "exam": "enem",
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "spelling_anchors": 0,
+  "expected": {
+    "norma_culta": 85,
+    "coesao": 60,
+    "coerencia": 20,
+    "repertorio": 45,
+    "persuasao": 25
+  },
+  "text": "Dona Marta, o grêmio tem plena condição de organizar o festival sozinho, sem precisar de nenhum apoio da direção ou dos professores. Nós somos responsáveis e sabemos exatamente o que fazer em cada etapa do evento. Por outro lado, é verdade que ninguém do grêmio tem experiência com esse tipo de organização e que no ano passado a gente acabou deixando a quadra suja porque ninguém sabia quem era o responsável pela limpeza. Também não conseguimos definir horário de encerramento, e por isso o barulho passou da meia-noite. Mesmo assim, insisto que não precisamos de supervisão nenhuma, porque aprendemos com os erros que cometemos, ainda que não tenhamos feito nenhuma reunião para discutir esses erros até agora. O festival vai dar certo justamente porque somos os mesmos alunos do ano passado, e a senhora pode confiar totalmente na nossa organização, que ainda vamos montar."
+}
