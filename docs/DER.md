@@ -1,8 +1,17 @@
 # DER: Argumenta
 
-Versão 0.8, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.9, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.9 (issue 14): nenhuma coluna nova. O expurgo LGPD ganhou forma:
+`DELETE /me` marca `users.deleted_at` e aposenta `auth_identities` e
+`push_devices` na hora (um único parcial vivo de identidade recusaria o mesmo
+Google entrando de novo, e um token vivo continuaria recebendo push); a
+varredura, depois da carência, faz `DELETE FROM users`, e **todo o resto sai por
+cascade**. As 12 tabelas que descem com o aluno não são lista escrita à mão: são
+derivadas das FKs a partir de `users`, e um guard de metadata reprova qualquer FK
+nova que não seja `CASCADE` ou `SET NULL`, porque ela quebraria o apagamento.
 
 Mudanças da v0.8 (issue 13): `telemetry_events.occurred_at`, a hora do evento no
 cliente. `created_at` é a hora do flush do buffer, e ritmo de digitação é série

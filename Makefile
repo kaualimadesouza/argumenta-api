@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck imports test run check db migrate migration downgrade seed
+.PHONY: install lint format typecheck imports test run check db migrate migration downgrade seed purge
 
 install: ; uv sync
 lint: ; uv run ruff check .
@@ -13,3 +13,4 @@ migrate: ; uv run alembic upgrade head
 migration: ; uv run alembic revision --autogenerate -m "$(m)"
 downgrade: ; uv run alembic downgrade -1
 seed: ; uv run python -m argumenta.entrypoints.seed_content
+purge: ; uv run python -m argumenta.entrypoints.purge_accounts

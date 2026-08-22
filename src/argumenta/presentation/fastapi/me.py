@@ -1,12 +1,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from argumenta.application.accounts.ports import AccountRepository, ExamTargetRepository
 from argumenta.application.accounts.use_cases import (
     AddExamTarget,
     AddExamTargetUseCase,
+    DeleteAccountUseCase,
     GetMeUseCase,
     RemoveExamTarget,
     RemoveExamTargetUseCase,
@@ -14,11 +15,13 @@ from argumenta.application.accounts.use_cases import (
     SetActiveExamTargetUseCase,
 )
 from argumenta.presentation.fastapi.dependencies import (
+    AppSettings,
     CurrentUserId,
     get_account_repository,
     get_exam_target_repository,
 )
 from argumenta.presentation.fastapi.schemas import (
+    AccountDeletionResponse,
     AddTargetRequest,
     MeResponse,
     TargetResponse,
@@ -38,6 +41,21 @@ def get_me(user_id: CurrentUserId, accounts: Accounts, targets: Targets) -> MeRe
         user=UserResponse.from_domain(view.user),
         targets=[TargetResponse.from_domain(t) for t in view.targets],
     )
+
+
+@router.delete("", status_code=202)
+def delete_me(
+    user_id: CurrentUserId,
+    response: Response,
+    accounts: Accounts,
+    settings: AppSettings,
+) -> AccountDeletionResponse:
+    """LGPD erasure, self-service: the session dies here and the data is purged
+    after the grace window (`ARGUMENTA_ACCOUNT_PURGE_GRACE_DAYS`)."""
+    receipt = DeleteAccountUseCase(accounts, settings.account_purge_grace_days).execute(user_id)
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/auth")
+    return AccountDeletionResponse.from_domain(receipt)
 
 
 @router.post("/targets", status_code=201)

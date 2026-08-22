@@ -112,13 +112,18 @@ def get_google_gateway() -> GoogleIdentityGateway:
 
 def get_current_user_id(
     token_service: Annotated[JwtTokenService, Depends(get_token_service)],
+    accounts: Annotated[SqlAlchemyAccountRepository, Depends(get_account_repository)],
     access_token: Annotated[str | None, Cookie()] = None,
 ) -> uuid.UUID:
+    """The account lookup is what ends a session: the token is stateless, so
+    after `DELETE /me` only the database knows it is worthless."""
     if access_token is None:
         raise HTTPException(status_code=401, detail="not authenticated")
     user_id = token_service.verify(access_token, kind="access")
     if user_id is None:
         raise HTTPException(status_code=401, detail="invalid or expired token")
+    if not accounts.is_active(user_id):
+        raise HTTPException(status_code=401, detail="this account no longer exists")
     return user_id
 
 

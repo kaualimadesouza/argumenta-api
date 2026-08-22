@@ -6,6 +6,7 @@ from sqlalchemy import Enum
 
 import argumenta.adapters.db.models  # noqa: F401  (registers all tables)
 from argumenta.adapters.db.base import Base
+from argumenta.adapters.db.user_data import BLOCKING_FOREIGN_KEYS, USER_DATA_TABLES
 
 EXPECTED_TABLES = {
     "users",
@@ -80,3 +81,11 @@ def test_the_telemetry_events_are_indexed_by_user_and_time() -> None:
     index = by_name.get("ix_telemetry_events_user_created")
     assert index is not None, f"missing, found {sorted(by_name)}"
     assert [column.name for column in index.columns] == ["user_id", "created_at"]
+
+
+def test_every_link_into_a_students_data_can_be_erased() -> None:
+    """The LGPD purge (issue #14) hard deletes the user row and lets Postgres do
+    the rest, so a foreign key into their data that neither cascades nor nulls
+    would fail the erasure instead of a test."""
+    assert "submissions" in USER_DATA_TABLES, "the walk found nothing, so it guards nothing"
+    assert BLOCKING_FOREIGN_KEYS == (), f"these would refuse the delete: {BLOCKING_FOREIGN_KEYS}"

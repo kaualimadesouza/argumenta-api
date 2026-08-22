@@ -2,6 +2,7 @@ from argumenta.application.accounts.use_cases.add_exam_target import (
     AddExamTarget,
     AddExamTargetUseCase,
 )
+from argumenta.application.accounts.use_cases.delete_account import DeleteAccountUseCase
 from argumenta.application.accounts.use_cases.get_me import GetMeUseCase, MeView
 from argumenta.application.accounts.use_cases.login_with_email import (
     LoginWithEmail,
@@ -10,6 +11,9 @@ from argumenta.application.accounts.use_cases.login_with_email import (
 from argumenta.application.accounts.use_cases.login_with_google import (
     LoginWithGoogle,
     LoginWithGoogleUseCase,
+)
+from argumenta.application.accounts.use_cases.purge_deleted_accounts import (
+    PurgeDeletedAccountsUseCase,
 )
 from argumenta.application.accounts.use_cases.register_with_email import (
     RegisterWithEmail,
@@ -27,12 +31,14 @@ from argumenta.application.accounts.use_cases.set_active_exam_target import (
 __all__ = [
     "AddExamTarget",
     "AddExamTargetUseCase",
+    "DeleteAccountUseCase",
     "GetMeUseCase",
     "LoginWithEmail",
     "LoginWithEmailUseCase",
     "LoginWithGoogle",
     "LoginWithGoogleUseCase",
     "MeView",
+    "PurgeDeletedAccountsUseCase",
     "RegisterWithEmail",
     "RegisterWithEmailUseCase",
     "RemoveExamTarget",

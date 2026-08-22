@@ -1,9 +1,11 @@
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol
 
 from argumenta.domain.accounts import ExamTarget, GoogleIdentity, UserAccount
 from argumenta.domain.enums import Exam
+from argumenta.domain.privacy import PurgeReport
 
 
 class AccountRepository(Protocol):
@@ -22,6 +24,30 @@ class AccountRepository(Protocol):
     def get_email_password_hash(self, user_id: uuid.UUID) -> str | None: ...
 
     def find_user_by_google_subject(self, subject: str) -> UserAccount | None: ...
+
+    def is_active(self, user_id: uuid.UUID) -> bool:
+        """Tokens are stateless, so this is what ends a session: every request
+        asks whether the account is still there."""
+        ...
+
+    def soft_delete(self, user_id: uuid.UUID) -> datetime | None:
+        """Marks the account deleted and returns when; None when it was already
+        gone, which is a race between two requests of the same student."""
+        ...
+
+    def retire_credentials(self, user_id: uuid.UUID) -> None:
+        """Identities and push devices stop working at once. Not only hygiene:
+        a live identity row would refuse the same Google account signing up
+        again, and a live device token would keep getting notifications."""
+        ...
+
+
+class AccountPurger(Protocol):
+    def due_for_purge(self, cutoff: datetime, limit: int) -> Sequence[uuid.UUID]: ...
+
+    def purge(self, user_id: uuid.UUID) -> PurgeReport:
+        """Hard delete of the user row; every dependent leaves by cascade."""
+        ...
 
 
 class ExamTargetRepository(Protocol):

@@ -57,10 +57,27 @@ Limitações conhecidas do beta (decisão de produto, sem e-mail transacional):
 - Cadastro sem verificação de e-mail e sem fluxo "esqueci a senha"; o caminho de
   recuperação sugerido é o login com Google.
 - Tokens são stateless: logout limpa os cookies, mas não existe revogação
-  server-side de um token exfiltrado (session store fica para a fase 2).
+  server-side de um token exfiltrado (session store fica para a fase 2). A única
+  revogação que existe é a da conta excluída: toda requisição autenticada
+  confirma no banco que a conta ainda está lá.
 
 Google OAuth exige `ARGUMENTA_GOOGLE_CLIENT_ID` e `ARGUMENTA_GOOGLE_CLIENT_SECRET`
 (criados no Google Cloud Console); sem eles o endpoint `/auth/google` responde 502.
+
+## Exclusão de conta (LGPD)
+
+`DELETE /me` responde 202: a conta para de funcionar na hora (sessão morta,
+identidades e dispositivos aposentados, login recusado) e as linhas são
+apagadas pela varredura, depois da janela de carência
+(`ARGUMENTA_ACCOUNT_PURGE_GRACE_DAYS`, 7 dias). A carência é a única chance de
+desfazer uma exclusão por engano; o aluno não percebe diferença, porque para ele
+a conta já morreu.
+
+A varredura é `make purge` (`python -m argumenta.entrypoints.purge_accounts`),
+feita para rodar agendada: ela apaga a linha de `users` e o Postgres derruba
+todo o resto por cascade. O expurgo é **hard delete**, a única exceção ao soft
+delete universal do DER, porque o texto do aluno é dado pessoal. Um teste de
+schema garante que nenhuma tabela nova entre com FK que recuse o delete.
 
 ## Releases
 

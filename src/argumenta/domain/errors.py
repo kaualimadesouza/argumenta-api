@@ -6,6 +6,10 @@ class EmailAlreadyRegisteredError(DomainError):
     pass
 
 
+class AccountNotFoundError(DomainError):
+    pass
+
+
 class InvalidCredentialsError(DomainError):
     pass
 
