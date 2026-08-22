@@ -19,6 +19,7 @@ from argumenta.adapters.db.repositories.gameplay import (
 )
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
 from argumenta.adapters.db.repositories.reactions import SqlAlchemyReactionRepository
+from argumenta.adapters.db.repositories.telemetry import SqlAlchemyTelemetryRepository
 from argumenta.adapters.db.repositories.track import (
     SqlAlchemyActivityRepository,
     SqlAlchemyContentRepository,
@@ -38,6 +39,7 @@ from argumenta.application.evaluation.use_cases import EvaluateArgumentUseCase
 from argumenta.application.gameplay.use_cases import SubmitArgumentUseCase
 from argumenta.application.reactions.ports import ReactionEngine
 from argumenta.application.reactions.use_cases import GetCharacterReactionUseCase
+from argumenta.application.telemetry.use_cases import RecordTelemetryEventsUseCase
 from argumenta.settings import Settings, get_settings
 
 
@@ -224,3 +226,13 @@ def get_submit_argument_use_case(
     exams: Annotated[SqlAlchemyExamTargetRepository, Depends(get_exam_target_repository)],
 ) -> SubmitArgumentUseCase:
     return SubmitArgumentUseCase(contexts, submissions, progress, activity, drafts, evaluate, exams)
+
+
+def get_telemetry_repository(session: DbSession) -> SqlAlchemyTelemetryRepository:
+    return SqlAlchemyTelemetryRepository(session)
+
+
+def get_record_telemetry_use_case(
+    events: Annotated[SqlAlchemyTelemetryRepository, Depends(get_telemetry_repository)],
+) -> RecordTelemetryEventsUseCase:
+    return RecordTelemetryEventsUseCase(events)

@@ -60,3 +60,15 @@ class DailyLimitReachedError(DomainError):
 
 class SubmissionNotFoundError(DomainError):
     pass
+
+
+class EmptyTelemetryBatchError(DomainError):
+    pass
+
+
+class TelemetryBatchTooLargeError(DomainError):
+    pass
+
+
+class TelemetryPayloadTooLargeError(DomainError):
+    pass
