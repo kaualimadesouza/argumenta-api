@@ -154,13 +154,18 @@ def get_draft_repository(session: DbSession) -> SqlAlchemyDraftRepository:
     return SqlAlchemyDraftRepository(session)
 
 
-def get_evaluation_engine() -> EvaluationEngine:
+@lru_cache
+def _evaluation_engine_singleton() -> ClaudeEvaluationEngine:
     settings = get_settings()
     return ClaudeEvaluationEngine(
         api_key=settings.anthropic_api_key,
         model=settings.evaluation_model,
         effort=settings.evaluation_effort,
     )
+
+
+def get_evaluation_engine() -> EvaluationEngine:
+    return _evaluation_engine_singleton()
 
 
 def get_spell_checker() -> SpyllsSpellChecker:
@@ -190,7 +195,8 @@ def get_reaction_repository(session: DbSession) -> SqlAlchemyReactionRepository:
 
 @lru_cache
 def _reaction_engine_singleton() -> ClaudeReactionEngine:
-    """One HTTP client for the process, like the other singletons here."""
+    """One HTTP client for the process, like the evaluation engine above: an
+    Anthropic client per request means a connection pool per request."""
     settings = get_settings()
     return ClaudeReactionEngine(
         api_key=settings.anthropic_api_key,

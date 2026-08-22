@@ -1,8 +1,18 @@
 # DER: Argumenta
 
-Versão 0.6, 2026-08-20. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.7, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.7 (implementação das issues 10, 11 e 33):
+`character_reactions.input_tokens` e o único parcial
+`UNIQUE (submission_id, beat) WHERE deleted_at IS NULL`, que tira o get-or-create
+da reação das mãos da aplicação; `evaluations.lens_version` e `evaluations.exam`,
+a lente de exibição usada no envio (a lente nunca move o veredito, decisão 27 do
+PRD). A migration que cria esse único **não é expand only**: ela estreita o que o
+release anterior podia escrever, então roda dois backfills antes (aposenta as
+falas gravadas como `model = 'fallback'` e desduplica beats repetidos), e um
+rollback exige `downgrade`, não só voltar a imagem.
 
 Mudanças da v0.6: `users.terms_accepted_at`, o registro do aceite da política de
 privacidade e dos termos de uso no cadastro (LGPD; par do card de política de
@@ -255,6 +265,8 @@ erDiagram
     smallint min_average "media congelada no envio"
     text model
     text prompt_version
+    text lens_version "mapeamento de exibicao no envio"
+    exam exam "lente ativa do aluno no envio"
     integer latency_ms
     integer input_tokens
     integer output_tokens
@@ -356,8 +368,10 @@ Notas:
   Índice único parcial `UNIQUE (submission_id, beat) WHERE deleted_at IS NULL`: é
   uma linha por beat, então o get-or-create da reação é garantia do banco, e os
   quatro beats convivem na mesma submissão. A fala roteirizada de fallback **não**
-  é gravada: a tabela significa exatamente "gastamos tokens aqui", e a reação real
-  chega quando o motor volta.
+  é gravada, e a resposta a marca como provisória, então a reação real chega
+  quando o motor volta. A invariante é de mão única: linha implica tokens gastos,
+  não o contrário (um cliente que perde a corrida do beat, ou que desiste depois
+  da geração, foi cobrado sem deixar linha).
 
 ## Domínio 4: hábito e telemetria
 
@@ -428,6 +442,8 @@ linha logicamente apagada sem colisão.
 - `submissions (user_id, chapter_id)`: histórico de tentativas do capítulo.
 - `evaluations (submission_id) WHERE is_current AND deleted_at IS NULL`: único
   parcial, garante uma avaliação corrente por envio.
+- `character_reactions (submission_id, beat) WHERE deleted_at IS NULL`: único
+  parcial, uma reação por beat da submissão.
 - `evaluation_scores (evaluation_id)` e, para o gráfico de evolução,
   `evaluation_scores (dimension)` combinado com join em `evaluations.created_at`.
 - `telemetry_events (user_id, created_at)`: consultas por aluno e período.

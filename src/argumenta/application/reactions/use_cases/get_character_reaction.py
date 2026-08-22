@@ -1,8 +1,10 @@
+import logging
 import uuid
 from dataclasses import dataclass
 
 from argumenta.application.evaluation.ports import LlmBudget
 from argumenta.application.reactions.ports import (
+    ReactionContext,
     ReactionEngine,
     ReactionRepository,
     ReactionRequest,
@@ -14,7 +16,13 @@ from argumenta.domain.errors import (
     LlmBudgetExceededError,
     SubmissionNotFoundError,
 )
-from argumenta.domain.reactions import reaction_beat_for, scripted_reaction
+from argumenta.domain.reactions import (
+    needs_authored_line,
+    reaction_beat_for,
+    scripted_reaction,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -22,14 +30,23 @@ class ReactionView:
     beat: ReactionBeat
     character_name: str
     body: str
+    provisional: bool
+    """True for the authored fallback: nothing was stored, and the real
+    reaction still arrives once the engine or the budget recovers. The client
+    needs this to mark the beat instead of showing two lines with no
+    explanation."""
 
 
 class GetCharacterReactionUseCase:
     """Get-or-create the character's reaction to a judged submission: one LLM
-    call per submission at most, and an authored line when the engine or the
-    monthly budget is unavailable. The scripted line is never stored, so the
-    real reaction still arrives once the engine recovers, and
-    character_reactions keeps meaning exactly "tokens were spent here"."""
+    call per beat at most, and an authored line when the engine or the monthly
+    budget is unavailable. The scripted line is never stored, so the real
+    reaction still arrives once the engine recovers.
+
+    A row in character_reactions therefore means tokens were spent, but not the
+    other way round: a client that times out, or that loses the race for a beat,
+    was billed without leaving a row.
+    """
 
     def __init__(
         self,
@@ -51,13 +68,13 @@ class GetCharacterReactionUseCase:
         if beat is None:
             return None
 
-        stored = self._reactions.find(user_id, submission_id, beat)
+        stored = self._reactions.find_body(submission_id, beat)
         if stored is not None:
-            return ReactionView(beat=beat, character_name=stored.character_name, body=stored.body)
+            return self._view(beat, context, stored, provisional=False)
 
         try:
             self._budget.ensure_within_budget()
-            text = self._engine.generate(
+            reaction = self._engine.generate(
                 ReactionRequest(
                     character_name=context.character_name,
                     persona_brief=context.persona_brief,
@@ -66,13 +83,32 @@ class GetCharacterReactionUseCase:
                     student_text=context.student_text,
                 )
             )
-        except (LlmBudgetExceededError, EvaluationFailedError):
-            return ReactionView(
-                beat=beat,
-                character_name=context.character_name,
-                body=scripted_reaction(
-                    beat, self._content.list_beats(context.chapter_id, Branch.CONSEQUENCE)
-                ),
-            )
-        self._reactions.store(submission_id, context.character_id, beat, text)
-        return ReactionView(beat=beat, character_name=context.character_name, body=text.body)
+        except (LlmBudgetExceededError, EvaluationFailedError) as error:
+            logger.warning("character reaction fell back to the authored line: %s", error)
+            return self._view(beat, context, self._authored(beat, context), provisional=True)
+
+        body = self._reactions.store_or_get(submission_id, context.character_id, beat, reaction)
+        return self._view(beat, context, body, provisional=False)
+
+    def _authored(self, beat: ReactionBeat, context: ReactionContext) -> str:
+        """The scene is only read when the beat has a hand written equivalent,
+        so an approved student does not pay for a query nobody reads."""
+        authored = (
+            self._content.list_beats(context.chapter_id, Branch.CONSEQUENCE)
+            if needs_authored_line(beat)
+            else ()
+        )
+        return scripted_reaction(beat, authored)
+
+    @staticmethod
+    def _view(
+        beat: ReactionBeat, context: ReactionContext, body: str, provisional: bool
+    ) -> ReactionView:
+        """Always the chapter's current antagonist, in every branch: the name
+        must not depend on which path produced the line."""
+        return ReactionView(
+            beat=beat,
+            character_name=context.character_name,
+            body=body,
+            provisional=provisional,
+        )

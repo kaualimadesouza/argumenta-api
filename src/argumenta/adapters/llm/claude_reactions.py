@@ -8,6 +8,8 @@ from argumenta.adapters.llm.prompts.reaction_v1 import (
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
+from argumenta.adapters.llm.prompts.student_text import defuse_fence
+from argumenta.adapters.llm.usage import billed_input_tokens
 from argumenta.application.reactions.ports import ReactionRequest, ReactionText
 from argumenta.domain.enums import Verdict
 from argumenta.domain.errors import EvaluationFailedError
@@ -25,8 +27,14 @@ class ClaudeReactionEngine:
         model: str,
         max_tokens: int = 1500,
         effort: Effort = "low",
+        timeout: float = 30.0,
+        max_retries: int = 1,
     ) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
+        # the call happens inside an open transaction, so the SDK default of ten
+        # minutes would hold a pool connection idle in transaction that long
+        self._client = anthropic.Anthropic(
+            api_key=api_key, timeout=timeout, max_retries=max_retries
+        )
         self._model = model
         self._max_tokens = max_tokens
         self._effort = effort
@@ -49,7 +57,7 @@ class ClaudeReactionEngine:
                             persona_brief=request.persona_brief,
                             chapter_objective=request.chapter_objective,
                             verdict_instruction=instruction,
-                            student_text=request.student_text,
+                            student_text=defuse_fence(request.student_text),
                         ),
                     }
                 ],
@@ -65,6 +73,6 @@ class ClaudeReactionEngine:
             body=body,
             model=self._model,
             prompt_version=PROMPT_VERSION,
-            input_tokens=response.usage.input_tokens,
+            input_tokens=billed_input_tokens(response.usage),
             output_tokens=response.usage.output_tokens,
         )

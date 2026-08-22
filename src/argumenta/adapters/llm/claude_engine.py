@@ -13,6 +13,8 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import (
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
+from argumenta.adapters.llm.prompts.student_text import defuse_fence
+from argumenta.adapters.llm.usage import billed_input_tokens
 from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
@@ -101,8 +103,14 @@ class ClaudeEvaluationEngine:
         model: str,
         max_tokens: int = 8000,
         effort: Effort = "high",
+        timeout: float = 90.0,
+        max_retries: int = 1,
     ) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
+        # the call happens inside an open transaction, so the SDK default of ten
+        # minutes would hold a pool connection idle in transaction that long
+        self._client = anthropic.Anthropic(
+            api_key=api_key, timeout=timeout, max_retries=max_retries
+        )
         self._model = model
         self._max_tokens = max_tokens
         self._effort = effort
@@ -129,7 +137,7 @@ class ClaudeEvaluationEngine:
                             anchors=_format_anchors(request),
                             dimensions=_format_dimensions(request.required_dimensions),
                             format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
-                            text=request.text,
+                            text=defuse_fence(request.text),
                         ),
                     }
                 ],
@@ -166,6 +174,6 @@ class ClaudeEvaluationEngine:
             model=self._model,
             prompt_version=PROMPT_VERSION,
             latency_ms=latency_ms,
-            input_tokens=response.usage.input_tokens,
+            input_tokens=billed_input_tokens(response.usage),
             output_tokens=response.usage.output_tokens,
         )

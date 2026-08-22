@@ -20,6 +20,12 @@ def reaction_beat_for(verdict: Verdict) -> ReactionBeat | None:
     return None
 
 
+def needs_authored_line(beat: ReactionBeat) -> bool:
+    """Only a rebuttal has a hand written equivalent in the story, so only a
+    rebuttal is worth reading the consequence scene for."""
+    return beat == ReactionBeat.REBUTTAL
+
+
 def scripted_reaction(beat: ReactionBeat, authored_beats: Sequence[BeatContent]) -> str:
     """The authored line to play when the AI is unavailable. For a rebuttal the
     consequence scene already has the character's answer written by hand, which
