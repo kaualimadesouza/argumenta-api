@@ -186,17 +186,24 @@ def get_reaction_repository(session: DbSession) -> SqlAlchemyReactionRepository:
     return SqlAlchemyReactionRepository(session)
 
 
-def get_reaction_engine() -> ReactionEngine:
+@lru_cache
+def _reaction_engine_singleton() -> ClaudeReactionEngine:
+    """One HTTP client for the process, like the other singletons here."""
     settings = get_settings()
-    return ClaudeReactionEngine(api_key=settings.anthropic_api_key, model=settings.evaluation_model)
+    return ClaudeReactionEngine(api_key=settings.anthropic_api_key, model=settings.reaction_model)
+
+
+def get_reaction_engine() -> ReactionEngine:
+    return _reaction_engine_singleton()
 
 
 def get_character_reaction_use_case(
     reactions: Annotated[SqlAlchemyReactionRepository, Depends(get_reaction_repository)],
+    content: Annotated[SqlAlchemyContentRepository, Depends(get_content_repository)],
     engine: Annotated[ReactionEngine, Depends(get_reaction_engine)],
     budget: Annotated[SqlLlmBudget, Depends(get_llm_budget)],
 ) -> GetCharacterReactionUseCase:
-    return GetCharacterReactionUseCase(reactions, engine, budget)
+    return GetCharacterReactionUseCase(reactions, content, engine, budget)
 
 
 def get_submit_argument_use_case(

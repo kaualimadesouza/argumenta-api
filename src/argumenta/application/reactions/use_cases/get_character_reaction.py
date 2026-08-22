@@ -3,25 +3,18 @@ from dataclasses import dataclass
 
 from argumenta.application.evaluation.ports import LlmBudget
 from argumenta.application.reactions.ports import (
-    ReactionContext,
     ReactionEngine,
     ReactionRepository,
     ReactionRequest,
-    ReactionText,
 )
-from argumenta.domain.enums import ReactionBeat
+from argumenta.application.track.ports import ContentRepository
+from argumenta.domain.enums import Branch, ReactionBeat
 from argumenta.domain.errors import (
     EvaluationFailedError,
     LlmBudgetExceededError,
     SubmissionNotFoundError,
 )
-from argumenta.domain.reactions import reaction_beat_for
-
-FALLBACK_MODEL = "fallback"
-FALLBACK_PROMPT_VERSION = "scripted"
-
-_CONVINCED_FALLBACK = "{name} guarda a sua folha e assente devagar. Esta bem. Voce me convenceu."
-_REBUTTAL_FALLBACK = "{name} balanca a cabeca. Ainda nao me convenceu. Traga um plano concreto."
+from argumenta.domain.reactions import reaction_beat_for, scripted_reaction
 
 
 @dataclass(frozen=True)
@@ -32,14 +25,21 @@ class ReactionView:
 
 
 class GetCharacterReactionUseCase:
-    """Get-or-create the character's reaction to a judged submission: at most
-    one LLM call per submission, scripted fallback when the engine or the
-    monthly budget fails (the reaction is flavor, never a blocker)."""
+    """Get-or-create the character's reaction to a judged submission: one LLM
+    call per submission at most, and an authored line when the engine or the
+    monthly budget is unavailable. The scripted line is never stored, so the
+    real reaction still arrives once the engine recovers, and
+    character_reactions keeps meaning exactly "tokens were spent here"."""
 
     def __init__(
-        self, reactions: ReactionRepository, engine: ReactionEngine, budget: LlmBudget
+        self,
+        reactions: ReactionRepository,
+        content: ContentRepository,
+        engine: ReactionEngine,
+        budget: LlmBudget,
     ) -> None:
         self._reactions = reactions
+        self._content = content
         self._engine = engine
         self._budget = budget
 
@@ -50,21 +50,14 @@ class GetCharacterReactionUseCase:
         beat = reaction_beat_for(context.verdict)
         if beat is None:
             return None
-        existing = self._reactions.find(submission_id)
-        if existing is not None:
-            return ReactionView(
-                beat=existing.beat,
-                character_name=existing.character_name,
-                body=existing.body,
-            )
-        text = self._generate(context)
-        self._reactions.store(submission_id, context.character_id, beat, text)
-        return ReactionView(beat=beat, character_name=context.character_name, body=text.body)
 
-    def _generate(self, context: ReactionContext) -> ReactionText:
+        stored = self._reactions.find(user_id, submission_id, beat)
+        if stored is not None:
+            return ReactionView(beat=beat, character_name=stored.character_name, body=stored.body)
+
         try:
             self._budget.ensure_within_budget()
-            return self._engine.generate(
+            text = self._engine.generate(
                 ReactionRequest(
                     character_name=context.character_name,
                     persona_brief=context.persona_brief,
@@ -74,17 +67,12 @@ class GetCharacterReactionUseCase:
                 )
             )
         except (LlmBudgetExceededError, EvaluationFailedError):
-            return ReactionText(
-                body=_fallback_body(context),
-                model=FALLBACK_MODEL,
-                prompt_version=FALLBACK_PROMPT_VERSION,
-                output_tokens=None,
+            return ReactionView(
+                beat=beat,
+                character_name=context.character_name,
+                body=scripted_reaction(
+                    beat, self._content.list_beats(context.chapter_id, Branch.CONSEQUENCE)
+                ),
             )
-
-
-def _fallback_body(context: ReactionContext) -> str:
-    if reaction_beat_for(context.verdict) == ReactionBeat.CONVINCED:
-        return _CONVINCED_FALLBACK.format(name=context.character_name)
-    if context.scripted_rebuttal is not None:
-        return context.scripted_rebuttal
-    return _REBUTTAL_FALLBACK.format(name=context.character_name)
+        self._reactions.store(submission_id, context.character_id, beat, text)
+        return ReactionView(beat=beat, character_name=context.character_name, body=text.body)

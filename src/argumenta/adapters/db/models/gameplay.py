@@ -134,6 +134,15 @@ class EvaluationAnnotation(UuidPkMixin, AuditMixin, Base):
 
 class CharacterReaction(UuidPkMixin, AuditMixin, Base):
     __tablename__ = "character_reactions"
+    __table_args__ = (
+        Index(
+            "uq_character_reactions_submission_beat",
+            "submission_id",
+            "beat",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     submission_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False
@@ -147,6 +156,9 @@ class CharacterReaction(UuidPkMixin, AuditMixin, Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
     prompt_version: Mapped[str] = mapped_column(Text, nullable=False)
+    input_tokens: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, comment="prompt da reacao domina o custo"
+    )
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 

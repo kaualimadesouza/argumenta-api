@@ -22,7 +22,11 @@ class ReactionResponse(BaseModel):
     body: str
 
 
-@router.post("/{submission_id}/reaction", response_model=None)
+@router.post(
+    "/{submission_id}/reaction",
+    response_model=ReactionResponse,
+    responses={204: {"description": "no reaction for this verdict (failed_technical)"}},
+)
 def character_reaction(
     submission_id: uuid.UUID,
     user_id: CurrentUserId,
