@@ -1,11 +1,9 @@
 import time
 from typing import Any
 
-import anthropic
-from anthropic.types import ToolChoiceToolParam, ToolParam
 from pydantic import BaseModel, Field, ValidationError
 
-from argumenta.adapters.llm.contract import Effort, ensure_usable
+from argumenta.adapters.llm.effort import Effort
 from argumenta.adapters.llm.prompts.evaluation_v1 import (
     FULL_ESSAY_RULE,
     PROMPT_VERSION,
@@ -14,7 +12,7 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import (
     USER_TEMPLATE,
 )
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
-from argumenta.adapters.llm.usage import billed_input_tokens
+from argumenta.adapters.llm.provider import LlmProvider, StructuredCall
 from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
@@ -45,14 +43,7 @@ class EvaluationOutput(BaseModel):
 
 
 _TOOL_NAME = "report_evaluation"
-
-
-def _tool_definition() -> ToolParam:
-    return ToolParam(
-        name=_TOOL_NAME,
-        description="Report the structured evaluation of the student's text.",
-        input_schema=EvaluationOutput.model_json_schema(),
-    )
+_TOOL_DESCRIPTION = "Report the structured evaluation of the student's text."
 
 
 def parse_engine_output(payload: dict[str, Any], text: str) -> EvaluationOutput:
@@ -86,67 +77,46 @@ def _format_dimensions(required: tuple[Dimension, ...]) -> str:
     return "\n".join(f"- {dimension.value}" for dimension in required)
 
 
-class ClaudeEvaluationEngine:
-    """Forced tool use is what makes the output structured. Sonnet 5 rejects a
-    non-default temperature, so repeatability comes from that contract and the
-    versioned prompt; effort stays at the API default (calibration suite owns it)."""
+class LlmEvaluationEngine:
+    """The graded correction, on whatever vendor the provider talks to. The
+    structured contract and the versioned prompt are what make it repeatable;
+    the model is configuration (issue #43)."""
 
     def __init__(
         self,
-        api_key: str,
-        model: str,
+        provider: LlmProvider,
         max_tokens: int = 8000,
-        effort: Effort = "high",
-        timeout: float = 90.0,
-        max_retries: int = 1,
+        effort: Effort | None = "high",
     ) -> None:
-        # one retry, because a timed out call is billed server side and the
-        # retry is billed again without either being recorded
-        self._client = anthropic.Anthropic(
-            api_key=api_key, timeout=timeout, max_retries=max_retries
-        )
-        self._model = model
+        self._provider = provider
         self._max_tokens = max_tokens
         self._effort = effort
 
     def evaluate(self, request: EngineRequest) -> EngineResult:
         started = time.monotonic()
-        try:
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=self._max_tokens,
-                output_config={"effort": self._effort},
+        reply = self._provider.structured(
+            StructuredCall(
                 system=SYSTEM_PROMPT,
-                tools=[_tool_definition()],
-                tool_choice=ToolChoiceToolParam(type="tool", name=_TOOL_NAME),
-                messages=[
-                    {
-                        "role": "user",
-                        "content": USER_TEMPLATE.format(
-                            chapter_objective=request.chapter_objective,
-                            evaluator_brief=request.evaluator_brief,
-                            persona_brief=request.persona_brief,
-                            min_words=request.min_words,
-                            max_words=request.max_words,
-                            anchors=_format_anchors(request),
-                            dimensions=_format_dimensions(request.required_dimensions),
-                            format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
-                            text=defuse_fence(request.text),
-                        ),
-                    }
-                ],
+                user=USER_TEMPLATE.format(
+                    chapter_objective=request.chapter_objective,
+                    evaluator_brief=request.evaluator_brief,
+                    persona_brief=request.persona_brief,
+                    min_words=request.min_words,
+                    max_words=request.max_words,
+                    anchors=_format_anchors(request),
+                    dimensions=_format_dimensions(request.required_dimensions),
+                    format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
+                    text=defuse_fence(request.text),
+                ),
+                max_tokens=self._max_tokens,
+                effort=self._effort,
+                name=_TOOL_NAME,
+                description=_TOOL_DESCRIPTION,
+                schema=EvaluationOutput.model_json_schema(),
             )
-        except anthropic.AnthropicError as error:
-            raise EvaluationFailedError(str(error)) from error
-        latency_ms = int((time.monotonic() - started) * 1000)
-        ensure_usable(response.stop_reason, self._max_tokens)
-
-        payload = next(
-            (block.input for block in response.content if block.type == "tool_use"), None
         )
-        if not isinstance(payload, dict):
-            raise EvaluationFailedError("engine returned no tool_use block")
-        output = parse_engine_output(payload, request.text)
+        latency_ms = int((time.monotonic() - started) * 1000)
+        output = parse_engine_output(reply.payload, request.text)
 
         return EngineResult(
             scores=tuple(
@@ -165,9 +135,9 @@ class ClaudeEvaluationEngine:
                 )
                 for a in output.annotations
             ),
-            model=self._model,
+            model=reply.model,
             prompt_version=PROMPT_VERSION,
             latency_ms=latency_ms,
-            input_tokens=billed_input_tokens(response.usage),
-            output_tokens=response.usage.output_tokens,
+            input_tokens=reply.usage.input_tokens,
+            output_tokens=reply.usage.output_tokens,
         )

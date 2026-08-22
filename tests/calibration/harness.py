@@ -214,7 +214,7 @@ class ContrastOutcome:
 class CalibrationResult:
     prompt_version: str
     model: str
-    effort: str
+    effort: str | None
     """Prompt, model and effort all move the scores, so the report names the
     three of them: a run that does not say which one it measured is a run
     nobody can compare to the next."""

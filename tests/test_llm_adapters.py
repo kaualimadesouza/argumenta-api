@@ -1,5 +1,5 @@
-"""Issue #12: the contract both Claude adapters send and check, with a fake
-client so they run on every PR. The request shape is where Sonnet 5 breaks a
+"""Issue #12: the contract the Anthropic provider sends and checks, with a fake
+client so it runs on every PR. The request shape is where Sonnet 5 breaks a
 caller: a non-default temperature is a 400, and thinking comes out of max_tokens."""
 
 from typing import Any
@@ -8,16 +8,17 @@ import anthropic
 import pytest
 from anthropic.types import Message, StopReason, TextBlock, ToolUseBlock, Usage
 
-from argumenta.adapters.llm.claude_engine import ClaudeEvaluationEngine
-from argumenta.adapters.llm.claude_reactions import ClaudeReactionEngine
+from argumenta.adapters.llm.anthropic_provider import AnthropicProvider
 from argumenta.adapters.llm.contract import ensure_usable
+from argumenta.adapters.llm.evaluation_engine import LlmEvaluationEngine
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
+from argumenta.adapters.llm.reaction_engine import LlmReactionEngine
 from argumenta.adapters.llm.usage import billed_input_tokens
 from argumenta.application.evaluation.ports import EngineRequest
 from argumenta.application.reactions.ports import ReactionRequest
 from argumenta.domain.enums import Dimension, Verdict
 from argumenta.domain.errors import EvaluationFailedError
-from argumenta.presentation.fastapi.dependencies import get_reaction_engine
+from argumenta.presentation.fastapi.dependencies import get_evaluation_engine, get_reaction_engine
 from argumenta.settings import get_settings
 
 _GRADED = (
@@ -105,6 +106,18 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> Any:
     return install
 
 
+def _evaluation(timeout: float = 90.0) -> LlmEvaluationEngine:
+    return LlmEvaluationEngine(
+        AnthropicProvider(api_key="k", model="claude-sonnet-5", timeout=timeout)
+    )
+
+
+def _reaction(timeout: float = 30.0) -> LlmReactionEngine:
+    return LlmReactionEngine(
+        AnthropicProvider(api_key="k", model="claude-sonnet-5", timeout=timeout)
+    )
+
+
 def _engine_request() -> EngineRequest:
     return EngineRequest(
         text="palavra " * 130,
@@ -135,7 +148,7 @@ class TestEvaluationRequestContract:
         one makes every correction fail."""
         client = fake_client(_tool_response())
 
-        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+        _evaluation().evaluate(_engine_request())
 
         assert not {"temperature", "top_p", "top_k"} & set(client.messages.kwargs)
 
@@ -144,14 +157,14 @@ class TestEvaluationRequestContract:
         what the API does on its own, which keeps this adapter neutral."""
         client = fake_client(_tool_response())
 
-        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+        _evaluation().evaluate(_engine_request())
 
         assert client.messages.kwargs["output_config"] == {"effort": "high"}
 
     def test_the_budget_leaves_room_for_thinking_and_the_tool_call(self, fake_client: Any) -> None:
         client = fake_client(_tool_response())
 
-        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+        _evaluation().evaluate(_engine_request())
 
         assert client.messages.kwargs["max_tokens"] >= 8000
         assert client.messages.kwargs["tool_choice"]["name"] == "report_evaluation"
@@ -159,9 +172,7 @@ class TestEvaluationRequestContract:
     def test_the_scores_and_the_cost_come_back(self, fake_client: Any) -> None:
         fake_client(_tool_response())
 
-        result = ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(
-            _engine_request()
-        )
+        result = _evaluation().evaluate(_engine_request())
 
         assert len(result.scores) == 5
         assert (result.input_tokens, result.output_tokens) == (1200, 400)
@@ -171,7 +182,7 @@ class TestEvaluationRequestContract:
         fake_client(_tool_response(stop_reason="max_tokens"))
 
         with pytest.raises(EvaluationFailedError, match="max_tokens"):
-            ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+            _evaluation().evaluate(_engine_request())
 
 
 class TestClientBudget:
@@ -180,19 +191,25 @@ class TestClientBudget:
 
     def test_the_evaluation_client_bounds_the_call(self, fake_client: Any) -> None:
         client = fake_client(_tool_response())
+        get_evaluation_engine.cache_clear()
+        try:
+            get_evaluation_engine()
+        finally:
+            get_evaluation_engine.cache_clear()
 
-        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
-
-        assert client.init_kwargs["timeout"] == 90.0
+        assert client.init_kwargs["timeout"] == get_settings().evaluation_timeout_seconds
         assert client.init_kwargs["max_retries"] == 1
 
     def test_the_reaction_client_waits_less(self, fake_client: Any) -> None:
         client = fake_client(_text_response())
+        get_reaction_engine.cache_clear()
+        try:
+            get_reaction_engine()
+        finally:
+            get_reaction_engine.cache_clear()
 
-        ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
-
-        assert client.init_kwargs["timeout"] == 30.0
-        assert client.init_kwargs["max_retries"] == 1
+        assert client.init_kwargs["timeout"] == get_settings().reaction_timeout_seconds
+        assert client.init_kwargs["timeout"] < get_settings().evaluation_timeout_seconds
 
 
 class TestOneClientPerProcess:
@@ -218,7 +235,7 @@ class TestReactionRequestContract:
     def test_no_sampling_parameter_is_sent(self, fake_client: Any) -> None:
         client = fake_client(_text_response())
 
-        ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+        _reaction().generate(_reaction_request())
 
         assert not {"temperature", "top_p", "top_k"} & set(client.messages.kwargs)
 
@@ -227,7 +244,7 @@ class TestReactionRequestContract:
         with room to spare because a truncated reaction is an empty one."""
         client = fake_client(_text_response())
 
-        ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+        _reaction().generate(_reaction_request())
 
         assert client.messages.kwargs["output_config"] == {"effort": "low"}
         assert client.messages.kwargs["max_tokens"] >= 1500
@@ -235,9 +252,7 @@ class TestReactionRequestContract:
     def test_the_line_comes_back_stripped_with_its_cost(self, fake_client: Any) -> None:
         fake_client(_text_response())
 
-        reaction = ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(
-            _reaction_request()
-        )
+        reaction = _reaction().generate(_reaction_request())
 
         assert reaction.body == "Esta bem, voce me convenceu."
         assert (reaction.input_tokens, reaction.output_tokens) == (900, 42)
@@ -248,7 +263,7 @@ class TestReactionRequestContract:
         fake_client(_text_response(stop_reason="max_tokens"))
 
         with pytest.raises(EvaluationFailedError, match="max_tokens"):
-            ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+            _reaction().generate(_reaction_request())
 
 
 class TestUsableResponses:

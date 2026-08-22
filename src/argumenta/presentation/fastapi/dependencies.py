@@ -28,8 +28,9 @@ from argumenta.adapters.db.repositories.track import (
 )
 from argumenta.adapters.db.session import get_session_factory
 from argumenta.adapters.google.oauth import HttpGoogleIdentityGateway
-from argumenta.adapters.llm.claude_engine import ClaudeEvaluationEngine
-from argumenta.adapters.llm.claude_reactions import ClaudeReactionEngine
+from argumenta.adapters.llm.evaluation_engine import LlmEvaluationEngine
+from argumenta.adapters.llm.factory import build_provider
+from argumenta.adapters.llm.reaction_engine import LlmReactionEngine
 from argumenta.adapters.security.argon2_hasher import Argon2PasswordHasher
 from argumenta.adapters.security.jwt_tokens import JwtTokenService
 from argumenta.adapters.security.rate_limiter import SlidingWindowRateLimiter
@@ -174,11 +175,14 @@ def get_evaluation_engine() -> EvaluationEngine:
     """One HTTP client for the process: an Anthropic client per request means a
     connection pool per request."""
     settings = get_settings()
-    return ClaudeEvaluationEngine(
-        api_key=settings.anthropic_api_key,
-        model=settings.evaluation_model,
+    return LlmEvaluationEngine(
+        build_provider(
+            settings,
+            vendor=settings.llm_vendor,
+            model=settings.evaluation_model,
+            timeout=settings.evaluation_timeout_seconds,
+        ),
         effort=settings.evaluation_effort,
-        timeout=settings.evaluation_timeout_seconds,
     )
 
 
@@ -210,11 +214,14 @@ def get_reaction_repository(session: DbSession) -> SqlAlchemyReactionRepository:
 @lru_cache
 def get_reaction_engine() -> ReactionEngine:
     settings = get_settings()
-    return ClaudeReactionEngine(
-        api_key=settings.anthropic_api_key,
-        model=settings.reaction_model,
+    return LlmReactionEngine(
+        build_provider(
+            settings,
+            vendor=settings.reaction_llm_vendor or settings.llm_vendor,
+            model=settings.reaction_model,
+            timeout=settings.reaction_timeout_seconds,
+        ),
         effort=settings.reaction_effort,
-        timeout=settings.reaction_timeout_seconds,
     )
 
 
