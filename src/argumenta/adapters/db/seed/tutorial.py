@@ -1,4 +1,4 @@
-"""Seed of the tutorial story "O Gremio" (PRD section 6, DER content domain).
+"""Seed of the tutorial story "O Grêmio" (PRD section 6, DER content domain).
 
 Idempotent by slug: when the story already exists (not soft-deleted) nothing is
 touched, so the seed is safe to run on every deploy.
@@ -37,18 +37,18 @@ class ChapterSeed:
 
 CHARACTERS: dict[str, str] = {
     "Dona Marta": (
-        "Diretora ha vinte anos, pragmatica e avessa a risco; ja viu muito projeto "
+        "Diretora há vinte anos, pragmática e avessa a risco; já viu muito projeto "
         "de aluno morrer na praia. Respeita quem traz plano e dados, despreza apelo "
         "emocional vazio. Fala em frases curtas e cita fatos do ano passado."
     ),
-    "Seu Tenorio": (
-        "Zelador e chefe da manutencao, desconfiado e protetor do predio. Guarda "
-        "magoa do festival passado: quebraram duas cadeiras e ninguem limpou o "
-        "patio. Cede a quem demonstra responsabilidade concreta e verificavel."
+    "Seu Tenório": (
+        "Zelador e chefe da manutenção, desconfiado e protetor do prédio. Guarda "
+        "mágoa do festival passado: quebraram duas cadeiras e ninguém limpou o "
+        "pátio. Cede a quem demonstra responsabilidade concreta e verificável."
     ),
     "Ana Flor": (
-        "Presidente da associacao de pais, educada e firme. Fala em nome de pais "
-        "preocupados com bagunca e distracao das provas; muda de ideia diante de "
+        "Presidente da associação de pais, educada e firme. Fala em nome de pais "
+        "preocupados com bagunça e distração das provas; muda de ideia diante de "
         "argumento estruturado com contrapartidas claras."
     ),
 }
@@ -60,14 +60,14 @@ def _c1_beats() -> tuple[BeatSeed, ...]:
             Branch.MAIN,
             BeatType.NARRATION,
             "Sexta-feira, 7h20. O aviso no mural ainda tem cheiro de impressora: "
-            '"FESTIVAL CULTURAL - CANCELADO". Voce e presidente do gremio ha '
+            '"FESTIVAL CULTURAL, CANCELADO". Você é presidente do grêmio há '
             "exatamente onze dias.",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.DIALOGUE,
-            "Se veio falar do festival, economize saliva. Ano passado foi reclamacao "
-            "de barulho, patio imundo e tres pais na minha sala. Por que este ano "
+            "Se veio falar do festival, economize saliva. Ano passado foi reclamação "
+            "de barulho, pátio imundo e três pais na minha sala. Por que este ano "
             "seria diferente?",
             character="Dona Marta",
         ),
@@ -75,55 +75,55 @@ def _c1_beats() -> tuple[BeatSeed, ...]:
             Branch.MAIN,
             BeatType.OBJECTIVE,
             "Escreva para Dona Marta: por que o festival merece uma segunda chance, "
-            "e como o gremio vai evitar os problemas do ano passado.",
+            "e como o grêmio vai evitar os problemas do ano passado.",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.HINT,
-            "Reconheca os problemas do ano passado antes de prometer solucoes; a "
-            "diretora nao confia em quem finge que nada aconteceu.",
+            "Reconheça os problemas do ano passado antes de prometer soluções; a "
+            "diretora não confia em quem finge que nada aconteceu.",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            "Dona Marta tira os oculos e devolve a sua carta pela metade da mesa.",
+            "Dona Marta tira os óculos e devolve a sua carta pela metade da mesa.",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.DIALOGUE,
-            "Bonito, mas e o mesmo discurso do ano passado. Palavra sem plano e "
-            "papel. A decisao esta mantida.",
+            "Bonito, mas é o mesmo discurso do ano passado. Palavra sem plano é "
+            "papel. A decisão está mantida.",
             character="Dona Marta",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            'No corredor, o vice do gremio te alcanca: "Ela deixou uma brecha. '
-            'Disse que se alguem trouxesse um plano de verdade, ela leria."',
+            'No corredor, o vice do grêmio te alcança: "Ela deixou uma brecha. '
+            'Disse que se alguém trouxesse um plano de verdade, ela leria."',
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.NARRATION,
-            "Mesma sala, segunda-feira. Dona Marta aponta a cadeira e cruza os bracos.",
+            "Mesma sala, segunda-feira. Dona Marta aponta a cadeira e cruza os braços.",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.DIALOGUE,
-            "Voce tem cinco minutos da minha manha. Desta vez, seja especifico: o "
+            "Você tem cinco minutos da minha manhã. Desta vez, seja específico: o "
             "que muda, quem faz e o que acontece se der errado.",
             character="Dona Marta",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.OBJECTIVE,
-            "Reescreva a proposta respondendo as tres perguntas dela: o que muda, "
+            "Reescreva a proposta respondendo às três perguntas dela: o que muda, "
             "quem se responsabiliza e qual o plano se algo falhar.",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.HINT,
             "Estruture em causa e resposta: cada problema do ano passado ganha uma "
-            "medida concreta com responsavel.",
+            "medida concreta com responsável.",
         ),
     )
 
@@ -133,40 +133,40 @@ def _c2_beats() -> tuple[BeatSeed, ...]:
         BeatSeed(
             Branch.MAIN,
             BeatType.NARRATION,
-            'Dona Marta cedeu, com uma condicao: "Se o Tenorio topar cuidar da '
-            'estrutura, eu autorizo." O zelador esta consertando um portao e nem '
-            "levanta os olhos quando voce chega.",
+            'Dona Marta cedeu, com uma condição: "Se o Tenório topar cuidar da '
+            'estrutura, eu autorizo." O zelador está consertando um portão e nem '
+            "levanta os olhos quando você chega.",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.DIALOGUE,
-            "Festival? To fora. Ano passado sumiu cadeira, pichacao no banheiro e "
-            "adivinha quem varreu tudo sozinho no sabado? Escreve ai no seu "
-            "papelzinho: o patio e meu.",
-            character="Seu Tenorio",
+            "Festival? Tô fora. Ano passado sumiu cadeira, pichação no banheiro e "
+            "adivinha quem varreu tudo sozinho no sábado? Escreve aí no seu "
+            "papelzinho: o pátio é meu.",
+            character="Seu Tenório",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.OBJECTIVE,
-            "Escreva para Seu Tenorio: por que ele pode confiar o patio ao gremio "
+            "Escreva para Seu Tenório: por que ele pode confiar o pátio ao grêmio "
             "este ano, com compromissos concretos de cuidado e limpeza.",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.HINT,
-            "Comece pelo prejuizo dele, nao pelo seu evento; proponha compromissos "
+            "Comece pelo prejuízo dele, não pelo seu evento; proponha compromissos "
             "que ele consiga fiscalizar.",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            "Tenorio dobra o seu bilhete e usa para calcar a perna de uma mesa.",
+            "Tenório dobra o seu bilhete e usa para calçar a perna de uma mesa.",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.DIALOGUE,
-            "Promessa de estudante dura ate a primeira prova. Sem garantia, sem patio.",
-            character="Seu Tenorio",
+            "Promessa de estudante dura até a primeira prova. Sem garantia, sem pátio.",
+            character="Seu Tenório",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
@@ -177,27 +177,27 @@ def _c2_beats() -> tuple[BeatSeed, ...]:
         BeatSeed(
             Branch.RECOVERY,
             BeatType.NARRATION,
-            "Fim do expediente. Tenorio guarda as ferramentas e te da dois minutos, "
-            "o tempo de lavar as maos.",
+            "Fim do expediente. Tenório guarda as ferramentas e te dá dois minutos, "
+            "o tempo de lavar as mãos.",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.DIALOGUE,
             "Fala de novo. Mas agora eu quero saber quem assina, quem limpa e quem "
             "paga se quebrar.",
-            character="Seu Tenorio",
+            character="Seu Tenório",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.OBJECTIVE,
-            "Refaca a proposta com garantias verificaveis: nomes, escala de limpeza "
-            "e o que o gremio banca em caso de dano.",
+            "Refaça a proposta com garantias verificáveis: nomes, escala de limpeza "
+            "e o que o grêmio banca em caso de dano.",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.HINT,
-            "Compromisso verificavel tem nome, data e consequencia; generosidade "
-            "vaga nao conserta cadeira.",
+            "Compromisso verificável tem nome, data e consequência; generosidade "
+            "vaga não conserta cadeira.",
         ),
     )
 
@@ -207,71 +207,71 @@ def _c3_beats() -> tuple[BeatSeed, ...]:
         BeatSeed(
             Branch.MAIN,
             BeatType.NARRATION,
-            "Auditorio cheio na reuniao da associacao de pais. Dona Marta e Seu "
-            "Tenorio sentam na ultima fileira, do seu lado pela primeira vez.",
+            "Auditório cheio na reunião da associação de pais. Dona Marta e Seu "
+            "Tenório sentam na última fileira, do seu lado pela primeira vez.",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.DIALOGUE,
-            "Os pais respeitam o entusiasmo de voces. Mas estamos a dois meses das "
-            "provas. Nos convenca, por escrito, de que o festival soma em vez de "
-            "atrapalhar, ou a associacao vota contra.",
+            "Os pais respeitam o entusiasmo de vocês. Mas estamos a dois meses das "
+            "provas. Nos convença, por escrito, de que o festival soma em vez de "
+            "atrapalhar, ou a associação vota contra.",
             character="Ana Flor",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.OBJECTIVE,
             "Escreva o texto final para a assembleia: defenda o festival, responda "
-            "as preocupacoes dos pais e apresente como o gremio vai organiza-lo.",
+            "às preocupações dos pais e apresente como o grêmio vai organizá-lo.",
         ),
         BeatSeed(
             Branch.MAIN,
             BeatType.HINT,
-            "Nao ignore o argumento das provas: mostre como cultura e desempenho "
+            "Não ignore o argumento das provas: mostre como cultura e desempenho "
             "podem andar juntos, e feche com um encaminhamento concreto.",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            "Ana Flor le em silencio e passa o texto para a mesa. Um murmurio "
-            "atravessa o auditorio.",
+            "Ana Flor lê em silêncio e passa o texto para a mesa. Um murmúrio "
+            "atravessa o auditório.",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.DIALOGUE,
-            "Ha boas intencoes aqui, mas intencao nao organiza evento para "
-            "quinhentos alunos. A associacao precisa de mais do que isso.",
+            "Há boas intenções aqui, mas intenção não organiza evento para "
+            "quinhentos alunos. A associação precisa de mais do que isso.",
             character="Ana Flor",
         ),
         BeatSeed(
             Branch.CONSEQUENCE,
             BeatType.NARRATION,
-            "A votacao e adiada em uma semana. Dona Marta segura o seu ombro: "
-            '"Voce chegou ate aqui. Termine bem."',
+            "A votação é adiada em uma semana. Dona Marta segura o seu ombro: "
+            '"Você chegou até aqui. Termine bem."',
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.NARRATION,
-            "Reuniao extraordinaria. Desta vez, so a mesa diretora e voce.",
+            "Reunião extraordinária. Desta vez, só a mesa diretora e você.",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.DIALOGUE,
-            "Sem plateia agora. Reescreva o essencial: sua tese, suas razoes e o "
-            "seu plano. E a ultima palavra do gremio.",
+            "Sem plateia agora. Reescreva o essencial: sua tese, suas razões e o "
+            "seu plano. É a última palavra do grêmio.",
             character="Ana Flor",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.OBJECTIVE,
-            "Reescreva a redacao final: tese clara, argumentos respondendo as "
-            "objecoes e plano de organizacao como fecho.",
+            "Reescreva a redação final: tese clara, argumentos respondendo às "
+            "objeções e plano de organização como fecho.",
         ),
         BeatSeed(
             Branch.RECOVERY,
             BeatType.HINT,
-            "Releia as objecoes: provas, custo e seguranca; cada uma merece "
-            "resposta explicita no seu texto.",
+            "Releia as objeções: provas, custo e segurança; cada uma merece "
+            "resposta explícita no seu texto.",
         ),
     )
 
@@ -283,36 +283,36 @@ def _chapters() -> tuple[ChapterSeed, ...]:
             kind=ChapterKind.CONFRONTO,
             title="A porta da diretoria",
             objective=(
-                "Convencer Dona Marta a reabrir a discussao do festival, mostrando o "
-                "valor pedagogico do evento e como os riscos do cancelamento serao "
+                "Convencer Dona Marta a reabrir a discussão do festival, mostrando o "
+                "valor pedagógico do evento e como os riscos do cancelamento serão "
                 "tratados."
             ),
             antagonist="Dona Marta",
             min_words=120,
             max_words=250,
             evaluator_brief=(
-                "Argumento viavel conecta o valor pedagogico do festival a um "
+                "Argumento viável conecta o valor pedagógico do festival a um "
                 "tratamento concreto dos riscos citados (barulho, limpeza, "
-                "reclamacao de pais). Apelo emocional puro, ameaca de "
-                "abaixo-assinado ou promessa vaga nao passam."
+                "reclamação de pais). Apelo emocional puro, ameaça de "
+                "abaixo-assinado ou promessa vaga não passam."
             ),
             beats=_c1_beats(),
         ),
         ChapterSeed(
             kind=ChapterKind.CONFRONTO,
-            title="O patio do Tenorio",
+            title="O pátio do Tenório",
             objective=(
-                "Convencer Seu Tenorio a liberar o patio e apoiar a infraestrutura, "
-                "assumindo compromissos de cuidado com o espaco."
+                "Convencer Seu Tenório a liberar o pátio e apoiar a infraestrutura, "
+                "assumindo compromissos de cuidado com o espaço."
             ),
-            antagonist="Seu Tenorio",
+            antagonist="Seu Tenório",
             min_words=120,
             max_words=250,
             evaluator_brief=(
-                "Argumento viavel trata a magoa concreta do ano passado (dano e "
-                "limpeza) com compromissos verificaveis: escala de limpeza, termo "
-                "de responsabilidade, reposicao em caso de dano. Bajulacao ou "
-                "apelo a autoridade da diretora nao passam."
+                "Argumento viável trata a mágoa concreta do ano passado (dano e "
+                "limpeza) com compromissos verificáveis: escala de limpeza, termo "
+                "de responsabilidade, reposição em caso de dano. Bajulação ou "
+                "apelo à autoridade da diretora não passam."
             ),
             beats=_c2_beats(),
         ),
@@ -320,18 +320,18 @@ def _chapters() -> tuple[ChapterSeed, ...]:
             kind=ChapterKind.CHEFE,
             title="A assembleia",
             objective=(
-                "Redacao final: texto dissertativo-argumentativo defendendo o "
-                "festival cultural, respondendo as objecoes dos pais (provas, "
-                "custo, seguranca) com proposta de organizacao."
+                "Redação final: texto dissertativo-argumentativo defendendo o "
+                "festival cultural, respondendo às objeções dos pais (provas, "
+                "custo, segurança) com proposta de organização."
             ),
             antagonist="Ana Flor",
             min_words=250,
             max_words=450,
             evaluator_brief=(
-                "Texto completo com tese, argumentos desenvolvidos com repertorio, "
-                "contra-argumentacao as objecoes dos pais e encaminhamento "
-                "concreto de organizacao. Na lente ENEM, exige proposta de "
-                "intervencao clara."
+                "Texto completo com tese, argumentos desenvolvidos com repertório, "
+                "contra-argumentação às objeções dos pais e encaminhamento "
+                "concreto de organização. Na lente ENEM, exige proposta de "
+                "intervenção clara."
             ),
             beats=_c3_beats(),
         ),
@@ -348,10 +348,10 @@ def seed_tutorial(session: Session) -> bool:
 
     story = Story(
         slug=STORY_SLUG,
-        title="O Gremio",
+        title="O Grêmio",
         synopsis=(
-            "O festival cultural do colegio foi cancelado de ultima hora. Como novo "
-            "presidente do gremio, voce vai ter que convencer, por escrito, cada "
+            "O festival cultural do colégio foi cancelado de última hora. Como novo "
+            "presidente do grêmio, você vai ter que convencer, por escrito, cada "
             "pessoa que pode salvar o evento."
         ),
         position=1,

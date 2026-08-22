@@ -6,8 +6,8 @@ from collections.abc import Sequence
 from argumenta.domain.enums import BeatType, ReactionBeat, Verdict
 from argumenta.domain.track import BeatContent
 
-CONVINCED_FALLBACK = "Esta bem. Voce me convenceu: com esse plano eu topo."
-REBUTTAL_FALLBACK = "Ainda nao me convenceu. Traga um plano concreto e conversamos."
+CONVINCED_FALLBACK = "Está bem. Você me convenceu: com esse plano eu topo."
+REBUTTAL_FALLBACK = "Ainda não me convenceu. Traga um plano concreto e conversamos."
 
 
 def reaction_beat_for(verdict: Verdict) -> ReactionBeat | None:

@@ -217,7 +217,7 @@ class TestReactionEndpoint:
         assert response.status_code == 200
         body = response.json()
         # first dialogue beat of the consequence branch of chapter 1
-        assert body["body"].startswith("Bonito, mas e o mesmo discurso")
+        assert body["body"].startswith("Bonito, mas é o mesmo discurso")
         assert body["provisional"] is True, (
             "the client has to be able to tell a scripted line from a real one"
         )
@@ -306,7 +306,7 @@ class TestReactionEndpoint:
 
         assert response.status_code == 200
         assert reaction_engine.calls == []
-        assert response.json()["body"].startswith("Bonito, mas e o mesmo discurso")
+        assert response.json()["body"].startswith("Bonito, mas é o mesmo discurso")
         assert response.json()["provisional"] is True
         with Session(db_engine) as session:
             assert session.scalars(select(CharacterReaction)).all() == []
