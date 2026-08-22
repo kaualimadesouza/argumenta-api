@@ -48,7 +48,7 @@ correção instantânea transforma treino em hábito.
 | 18 | Conteúdo MVP | 3 histórias: tutorial + tema ENEM + tema FUVEST (~10 confrontos) |
 | 19 | Stack | FastAPI hexagonal (template python-hexagonal-framework) + Vite/React/TypeScript + Postgres + Claude API |
 | 20 | Métricas de validação | Fora de escopo por decisão do fundador |
-| 21 | Motor LLM | Claude Sonnet (`claude-sonnet-5`); a suíte de calibração decide upgrades de modelo |
+| 21 | Motor LLM | Provedor é configuração: Claude, GPT ou Gemini atrás da mesma porta. O padrão é `claude-sonnet-5`, e a suíte de calibração decide troca de modelo ou de provedor |
 | 22 | Streak | Qualquer envio no dia mantém a sequência, aprovado ou não (prática, não desempenho) |
 | 23 | E-mail transacional | Fora do beta: cadastro sem verificação de e-mail e sem reset por e-mail; Google SSO é o caminho de recuperação |
 | 24 | Custo LLM | Teto mensal configurável com alerta e bloqueio gracioso, medido pelos tokens em `evaluations` |

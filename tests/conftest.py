@@ -1,13 +1,12 @@
 import uuid
 from collections.abc import Iterator
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from httpx import Response
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
@@ -162,9 +161,10 @@ def game(
     return client, chapter_id
 
 
-def submit_text(client: TestClient, chapter_id: uuid.UUID, body: str = TEXT_130_WORDS) -> Response:
-    response: Response = client.post(f"/chapters/{chapter_id}/submissions", json={"body": body})
-    return response
+def submit_text(client: TestClient, chapter_id: uuid.UUID, body: str = TEXT_130_WORDS) -> Any:
+    """Untyped on purpose: starlette answers with httpx2 when it is installed
+    (the OpenAI SDK brings it), so the response type follows the client."""
+    return client.post(f"/chapters/{chapter_id}/submissions", json={"body": body})
 
 
 @pytest.fixture

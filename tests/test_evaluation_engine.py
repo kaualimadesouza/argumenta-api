@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from argumenta.adapters.llm.claude_engine import parse_engine_output
+from argumenta.adapters.llm.evaluation_engine import parse_engine_output
 from argumenta.adapters.llm.prompts.evaluation_v1 import PROMPT_VERSION
 from argumenta.application.evaluation.ports import (
     EngineRequest,

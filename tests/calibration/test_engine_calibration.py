@@ -10,6 +10,7 @@ import pathlib
 
 import pytest
 
+from argumenta.adapters.llm.factory import vendor_api_key
 from argumenta.adapters.llm.prompts.evaluation_v1 import PROMPT_VERSION
 from argumenta.adapters.spelling.spylls_checker import SpyllsSpellChecker
 from argumenta.application.evaluation.ports import EngineRequest, EvaluationEngine
@@ -36,8 +37,9 @@ pytestmark = pytest.mark.calibration
 def engine() -> EvaluationEngine:
     """The engine production gets, from the same factory: measuring a hand built
     one would let the two drift apart silently."""
-    if not get_settings().anthropic_api_key:
-        pytest.skip("set ARGUMENTA_ANTHROPIC_API_KEY to run the calibration suite")
+    settings = get_settings()
+    if not vendor_api_key(settings, settings.llm_vendor):
+        pytest.skip(f"set the API key of {settings.llm_vendor} to run the calibration suite")
     return get_evaluation_engine()
 
 

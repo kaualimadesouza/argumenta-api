@@ -5,12 +5,13 @@ Revises: bfb23f323d3f
 Create Date: 2026-08-22 17:24:47.530381
 
 """
+
 from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = '9e16860b95a2'  # pragma: allowlist secret
-down_revision: str | None = 'bfb23f323d3f'
+revision: str = "9e16860b95a2"  # pragma: allowlist secret
+down_revision: str | None = "bfb23f323d3f"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

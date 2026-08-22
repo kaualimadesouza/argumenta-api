@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from argumenta.adapters.llm.effort import Effort
+from argumenta.adapters.llm.provider import Vendor
 
 
 class Settings(BaseSettings):
@@ -20,19 +21,29 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
-    # evaluation engine (issue #7): Claude with structured output, temp 0
+    # which vendor answers (issue #43); the model name below belongs to it, and
+    # calibration is per vendor, model and prompt version
+    llm_vendor: Vendor = "anthropic"
+    reaction_llm_vendor: Vendor | None = None
+    """None follows `llm_vendor`; set it to move the flavour beat to a cheaper
+    vendor without touching the graded correction."""
+
+    # evaluation engine (issue #7): structured output, versioned prompt
     anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    google_api_key: str = ""
     evaluation_model: str = "claude-sonnet-5"
     # thinking effort of the graded correction; "high" is the API default, and
-    # changing it moves every score, so the calibration workflow watches this file
-    evaluation_effort: Effort = "high"
+    # changing it moves every score, so the calibration workflow watches this
+    # file. None asks for the vendor default, for models without the knob
+    evaluation_effort: Effort | None = "high"
     # the call runs inside an open transaction, so the SDK default (600s read,
     # 2 retries) would pin a pool connection for up to half an hour
     evaluation_timeout_seconds: float = 90.0
     # character reaction (issue #10): free text, own knob so the flavour beat can
     # move to a cheaper model without touching the graded correction
     reaction_model: str = "claude-sonnet-5"
-    reaction_effort: Effort = "low"
+    reaction_effort: Effort | None = "low"
     reaction_timeout_seconds: float = 30.0
     # monthly LLM cap in tokens over evaluations + character_reactions; 0 disables
     llm_monthly_token_budget: int = 10_000_000
