@@ -157,7 +157,9 @@ def get_draft_repository(session: DbSession) -> SqlAlchemyDraftRepository:
 def get_evaluation_engine() -> EvaluationEngine:
     settings = get_settings()
     return ClaudeEvaluationEngine(
-        api_key=settings.anthropic_api_key, model=settings.evaluation_model
+        api_key=settings.anthropic_api_key,
+        model=settings.evaluation_model,
+        effort=settings.evaluation_effort,
     )
 
 
@@ -190,7 +192,11 @@ def get_reaction_repository(session: DbSession) -> SqlAlchemyReactionRepository:
 def _reaction_engine_singleton() -> ClaudeReactionEngine:
     """One HTTP client for the process, like the other singletons here."""
     settings = get_settings()
-    return ClaudeReactionEngine(api_key=settings.anthropic_api_key, model=settings.reaction_model)
+    return ClaudeReactionEngine(
+        api_key=settings.anthropic_api_key,
+        model=settings.reaction_model,
+        effort=settings.reaction_effort,
+    )
 
 
 def get_reaction_engine() -> ReactionEngine:

@@ -1,22 +1,219 @@
-"""Issue #12: what the Claude adapters have to check about a response.
+"""Issue #12: the contract both Claude adapters send and check.
 
-Pure, so it runs on every PR: the adapters themselves are exercised by the
-calibration suite, which costs tokens and is opt-in.
+The calibration suite exercises the evaluation adapter against the real API and
+costs tokens; these run on every PR with a fake client, and they exist because
+the request shape is where Sonnet 5 breaks a caller: a non-default temperature
+is a 400, and thinking comes out of max_tokens.
 """
 
-import pytest
+from typing import Any
 
-from argumenta.adapters.llm.responses import ensure_not_truncated
+import anthropic
+import pytest
+from anthropic.types import Message, StopReason, TextBlock, ToolUseBlock, Usage
+
+from argumenta.adapters.llm.claude_engine import ClaudeEvaluationEngine
+from argumenta.adapters.llm.claude_reactions import ClaudeReactionEngine
+from argumenta.adapters.llm.contract import ensure_usable
+from argumenta.application.evaluation.ports import EngineRequest
+from argumenta.application.reactions.ports import ReactionRequest
+from argumenta.domain.enums import Dimension, Verdict
 from argumenta.domain.errors import EvaluationFailedError
 
+_GRADED = (
+    Dimension.NORMA_CULTA,
+    Dimension.COESAO,
+    Dimension.COERENCIA,
+    Dimension.REPERTORIO,
+    Dimension.PERSUASAO,
+)
 
-class TestTruncationGuard:
-    def test_a_truncated_response_says_so_instead_of_failing_the_schema(self) -> None:
-        """Thinking shares max_tokens with the answer, so this is the failure
-        mode a tight budget produces, and the message has to name it."""
-        with pytest.raises(EvaluationFailedError, match="truncated at max_tokens=8000"):
-            ensure_not_truncated("max_tokens", 8000)
+_SCORES = [
+    {"dimension": dimension.value, "score": 70, "evidence": "trecho citado"}
+    for dimension in _GRADED
+]
+
+
+class FakeMessages:
+    def __init__(self, response: Message) -> None:
+        self._response = response
+        self.kwargs: dict[str, Any] = {}
+
+    def create(self, **kwargs: Any) -> Message:
+        self.kwargs = kwargs
+        return self._response
+
+
+class FakeClient:
+    """Stands in for anthropic.Anthropic: records the request kwargs so a test
+    can assert the wire contract without spending a token."""
+
+    def __init__(self, response: Message) -> None:
+        self.messages = FakeMessages(response)
+
+
+def _tool_response(stop_reason: StopReason = "tool_use") -> Message:
+    return Message(
+        id="msg_1",
+        model="claude-sonnet-5",
+        role="assistant",
+        type="message",
+        stop_reason=stop_reason,
+        content=[
+            ToolUseBlock(
+                id="tu_1",
+                name="report_evaluation",
+                type="tool_use",
+                input={"scores": _SCORES, "annotations": []},
+            )
+        ],
+        usage=Usage(input_tokens=1200, output_tokens=400),
+    )
+
+
+def _text_response(stop_reason: StopReason = "end_turn") -> Message:
+    return Message(
+        id="msg_2",
+        model="claude-sonnet-5",
+        role="assistant",
+        type="message",
+        stop_reason=stop_reason,
+        content=[TextBlock(type="text", text="  Esta bem, voce me convenceu.  ")],
+        usage=Usage(input_tokens=900, output_tokens=42),
+    )
+
+
+@pytest.fixture
+def fake_client(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Whatever the adapter constructs, it gets the fake set by the test."""
+    holder: dict[str, FakeClient] = {}
+
+    def install(response: Message) -> FakeClient:
+        client = FakeClient(response)
+        holder["client"] = client
+        monkeypatch.setattr(anthropic, "Anthropic", lambda **_: client)
+        return client
+
+    return install
+
+
+def _engine_request() -> EngineRequest:
+    return EngineRequest(
+        text="palavra " * 130,
+        chapter_objective="Convencer a diretora.",
+        evaluator_brief="Plano concreto conta.",
+        persona_brief="Pragmatica.",
+        min_words=120,
+        max_words=250,
+        spelling_anchors=(),
+        required_dimensions=_GRADED,
+        full_essay=False,
+    )
+
+
+def _reaction_request() -> ReactionRequest:
+    return ReactionRequest(
+        character_name="Dona Marta",
+        persona_brief="Pragmatica.",
+        chapter_objective="Liberar o festival.",
+        verdict=Verdict.APPROVED,
+        student_text="palavra " * 130,
+    )
+
+
+class TestEvaluationRequestContract:
+    def test_no_sampling_parameter_is_sent(self, fake_client: Any) -> None:
+        """Sonnet 5 answers 400 to any temperature, top_p or top_k, so sending
+        one makes every correction fail."""
+        client = fake_client(_tool_response())
+
+        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+
+        assert not {"temperature", "top_p", "top_k"} & set(client.messages.kwargs)
+
+    def test_effort_is_explicit_and_defaults_to_the_api_default(self, fake_client: Any) -> None:
+        """Effort moves every score, so it is never implicit here; `high` is
+        what the API does on its own, which keeps this adapter neutral."""
+        client = fake_client(_tool_response())
+
+        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+
+        assert client.messages.kwargs["output_config"] == {"effort": "high"}
+
+    def test_the_budget_leaves_room_for_thinking_and_the_tool_call(self, fake_client: Any) -> None:
+        client = fake_client(_tool_response())
+
+        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+
+        assert client.messages.kwargs["max_tokens"] >= 8000
+        assert client.messages.kwargs["tool_choice"]["name"] == "report_evaluation"
+
+    def test_the_scores_and_the_cost_come_back(self, fake_client: Any) -> None:
+        fake_client(_tool_response())
+
+        result = ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(
+            _engine_request()
+        )
+
+        assert len(result.scores) == 5
+        assert (result.input_tokens, result.output_tokens) == (1200, 400)
+        assert result.model == "claude-sonnet-5"
+
+    def test_a_response_that_ran_out_of_room_says_so(self, fake_client: Any) -> None:
+        fake_client(_tool_response(stop_reason="max_tokens"))
+
+        with pytest.raises(EvaluationFailedError, match="max_tokens"):
+            ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+
+
+class TestReactionRequestContract:
+    def test_no_sampling_parameter_is_sent(self, fake_client: Any) -> None:
+        client = fake_client(_text_response())
+
+        ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+
+        assert not {"temperature", "top_p", "top_k"} & set(client.messages.kwargs)
+
+    def test_the_flavour_beat_thinks_as_little_as_possible(self, fake_client: Any) -> None:
+        """A reaction is performance, not judgement: low effort, and a budget
+        with room to spare because a truncated reaction is an empty one."""
+        client = fake_client(_text_response())
+
+        ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+
+        assert client.messages.kwargs["output_config"] == {"effort": "low"}
+        assert client.messages.kwargs["max_tokens"] >= 1500
+
+    def test_the_line_comes_back_stripped_with_its_cost(self, fake_client: Any) -> None:
+        fake_client(_text_response())
+
+        reaction = ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(
+            _reaction_request()
+        )
+
+        assert reaction.body == "Esta bem, voce me convenceu."
+        assert (reaction.input_tokens, reaction.output_tokens) == (900, 42)
+
+    def test_a_truncated_reaction_fails_instead_of_coming_back_empty(
+        self, fake_client: Any
+    ) -> None:
+        fake_client(_text_response(stop_reason="max_tokens"))
+
+        with pytest.raises(EvaluationFailedError, match="max_tokens"):
+            ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+
+
+class TestUsableResponses:
+    def test_running_out_of_context_is_the_same_class_of_failure(self) -> None:
+        """It used to fall through to "no tool_use block", which says nothing
+        about the real cause."""
+        with pytest.raises(EvaluationFailedError, match="model_context_window_exceeded"):
+            ensure_usable("model_context_window_exceeded", 8000)
+
+    def test_a_refusal_is_not_a_schema_error_either(self) -> None:
+        with pytest.raises(EvaluationFailedError, match="refused"):
+            ensure_usable("refusal", 8000)
 
     def test_a_complete_response_passes(self) -> None:
-        for stop_reason in ("end_turn", "tool_use", "stop_sequence", None):
-            ensure_not_truncated(stop_reason, 8000)
+        for stop_reason in ("end_turn", "tool_use", "stop_sequence", "pause_turn", None):
+            ensure_usable(stop_reason, 8000)

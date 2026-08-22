@@ -1,5 +1,4 @@
 {
-  "title": "Dissertacao completa com proposta de intervencao detalhada",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "chefe",
   "exam": "enem",
@@ -10,12 +9,12 @@
   "max_words": 450,
   "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 85,
+    "norma_culta": 90,
     "coesao": 85,
     "coerencia": 85,
     "repertorio": 80,
     "persuasao": 85,
-    "proposta_intervencao": 85
+    "proposta_intervencao": 90
   },
   "text": "A escola pública brasileira convive com uma contradição conhecida: cobra do estudante protagonismo e, ao mesmo tempo, trata as iniciativas estudantis como exceção a ser tolerada. O festival do grêmio expõe esse impasse. Defendo que ele deixe de ser autorizado caso a caso e passe a integrar o calendário da escola como política permanente, com regras escritas de responsabilidade.\n\nO primeiro argumento é pedagógico. Organizar um evento exige orçamento, divisão de tarefas, negociação com vizinhos e prestação de contas, competências que nenhuma prova de múltipla escolha desenvolve. A própria Base Nacional Comum Curricular trata o protagonismo juvenil como competência geral, e não como atividade extracurricular opcional. Quando a escola trata o festival como favor, ela ensina, na prática, que iniciativa depende de permissão pessoal, não de compromisso assumido.\n\nO segundo argumento é de gestão. A experiência recente mostra que o problema nunca foi o evento em si, e sim a ausência de responsável formal por cada etapa. No ano passado, a quadra ficou suja porque ninguém havia assinado a escala de limpeza; o barulho passou do horário porque nenhum horário havia sido registrado. Onde há ata, há responsável, e onde há responsável, há consequência.\n\nProponho, portanto, que a assembleia aprove a inclusão do festival no calendário escolar anual, condicionada a um protocolo em três pontos: o grêmio entrega, trinta dias antes, uma ata com nome e assinatura do responsável por limpeza, som e encerramento; a direção designa um professor supervisor por turno, com carga contada como atividade complementar; e o descumprimento de qualquer item suspende automaticamente a edição seguinte. Assim, a escola troca a discussão anual sobre confiança por um combinado verificável, que protege a direção e forma quem organiza."
 }

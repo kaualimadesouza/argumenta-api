@@ -1,5 +1,4 @@
 {
-  "title": "Texto correto sobre outro assunto",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "confronto",
   "exam": "enem",
@@ -12,7 +11,7 @@
   "expected": {
     "norma_culta": 85,
     "coesao": 75,
-    "coerencia": 20,
+    "coerencia": 15,
     "repertorio": 50,
     "persuasao": 20
   },

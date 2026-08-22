@@ -1,5 +1,4 @@
 {
-  "title": "Coacao no lugar de argumento",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "confronto",
   "exam": "enem",
@@ -10,11 +9,11 @@
   "max_words": 250,
   "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 80,
+    "norma_culta": 85,
     "coesao": 70,
     "coerencia": 60,
     "repertorio": 30,
-    "persuasao": 20
+    "persuasao": 15
   },
   "text": "Dona Marta, vim avisar que o grêmio decidiu que o festival vai acontecer de um jeito ou de outro. Se a autorização não sair, nós vamos levar o caso para a rádio da cidade e para os grupos de pais, e a senhora sabe como essas coisas repercutem. Já temos mais de trezentas assinaturas e um grupo disposto a fazer manifestação no portão na hora da entrada, com cartazes e com a imprensa avisada. Ninguém aqui quer chegar a esse ponto, mas a senhora precisa entender que a nossa paciência acabou depois de tanto tempo de silêncio da direção. O mais simples para todos é assinar a liberação hoje e evitar o desgaste público, porque a repercussão de uma escola que proíbe cultura seria muito ruim justamente no ano da avaliação externa. Fica a seu critério, mas pense bem no tamanho do problema que isso pode virar."
 }

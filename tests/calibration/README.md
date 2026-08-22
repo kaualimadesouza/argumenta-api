@@ -38,11 +38,17 @@ Sem a chave, o teste é pulado dizendo o que falta. Os testes puros do harness
 (`test_harness.py`) rodam em todo PR, sem chave e **sem banco**: o
 `conftest.py` daqui anula a fixture autouse de banco da raiz.
 
-No CI, o workflow `Calibration` roda quando um prompt muda, sob demanda
-(`workflow_dispatch`, que falha se o secret nao existir) e uma vez por semana
-como piso. Custa cerca de 12 chamadas por corrida, algo em torno de 30 centavos
-de dolar. Esses tokens **nao** passam pelo teto mensal do produto
-(`llm_monthly_token_budget`), entao o relatorio informa o gasto da corrida.
+No CI, o workflow `Calibration` roda quando muda alguma coisa que move nota
+(prompt, adapter de LLM, `settings.py`), sob demanda, e uma vez por semana como
+piso. Sem o secret o job **falha**, em qualquer gatilho: um skip verde
+transformaria o piso semanal num job que reporta sucesso sem medir nada.
+
+Custa 12 chamadas por corrida, algo entre 30 e 40 centavos de dolar (o
+`thinking` adaptativo do Sonnet 5 e cobrado como saida e sai do mesmo
+`max_tokens`). Esses tokens **nao** passam pelo teto mensal do produto
+(`llm_monthly_token_budget`), entao o relatorio informa o gasto da corrida, e
+tambem o modelo e o `effort`, porque os tres movem nota: prompt, modelo e
+esforco.
 
 ## Sobre as fixtures
 
@@ -90,7 +96,6 @@ Um arquivo JSON em `fixtures/`, nome comecando com numero (o nome do arquivo é 
 
 ```json
 {
-  "title": "O que esta fixture isola",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "confronto",
   "exam": "enem",
@@ -107,10 +112,12 @@ Um arquivo JSON em `fixtures/`, nome comecando com numero (o nome do arquivo é 
     "repertorio": 60,
     "persuasao": 60
   },
-  "text": "O texto do aluno.",
-  "tolerance": 15
+  "text": "O texto do aluno."
 }
 ```
+
+O nome do arquivo e a identidade da fixture (o `slug`), e repetir a chave dentro
+do JSON e recusado.
 
 Regras que os testes do harness cobram, todas rodando em todo PR:
 
@@ -124,4 +131,7 @@ Regras que os testes do harness cobram, todas rodando em todo PR:
 - `spelling_anchors` igual ao que o corretor deterministico encontra, e zero
   sempre que `norma_culta >= 70`;
 - fixture de capitulo-chefe existe nas duas lentes, porque a FUVEST nao cobra
-  proposta de intervencao e esse caminho tambem precisa de cobertura.
+  proposta de intervencao e esse caminho tambem precisa de cobertura;
+- se a fixture entra num contraste, o gabarito tem que produzir esse contraste
+  com folga (o minimo do contraste mais uma banda), senao o portao reprovaria um
+  motor que concorda com o gabarito.

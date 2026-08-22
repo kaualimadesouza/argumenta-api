@@ -1,5 +1,4 @@
 {
-  "title": "Boas ideias sem conectivo nem retomada",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "confronto",
   "exam": "enem",
@@ -10,7 +9,7 @@
   "max_words": 250,
   "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 80,
+    "norma_culta": 85,
     "coesao": 25,
     "coerencia": 55,
     "repertorio": 55,

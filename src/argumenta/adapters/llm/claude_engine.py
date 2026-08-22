@@ -5,6 +5,7 @@ import anthropic
 from anthropic.types import ToolChoiceToolParam, ToolParam
 from pydantic import BaseModel, Field, ValidationError
 
+from argumenta.adapters.llm.contract import Effort, ensure_usable
 from argumenta.adapters.llm.prompts.evaluation_v1 import (
     FULL_ESSAY_RULE,
     PROMPT_VERSION,
@@ -12,7 +13,6 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import (
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
-from argumenta.adapters.llm.responses import Effort, ensure_not_truncated
 from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
@@ -88,14 +88,19 @@ class ClaudeEvaluationEngine:
     """Claude with forced tool use: the tool schema is what makes the output
     structured. Sonnet 5 rejects a non-default temperature and thinks
     adaptively, so repeatability comes from the forced contract and the
-    versioned prompt, never from sampling parameters."""
+    versioned prompt, never from sampling parameters.
+
+    `effort` defaults to the API default, so this adapter does not quietly
+    change how hard the grader thinks. Lowering it is a decision to take with
+    the calibration suite in hand, not in passing.
+    """
 
     def __init__(
         self,
         api_key: str,
         model: str,
         max_tokens: int = 8000,
-        effort: Effort = "medium",
+        effort: Effort = "high",
     ) -> None:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
@@ -132,7 +137,7 @@ class ClaudeEvaluationEngine:
         except anthropic.AnthropicError as error:
             raise EvaluationFailedError(str(error)) from error
         latency_ms = int((time.monotonic() - started) * 1000)
-        ensure_not_truncated(response.stop_reason, self._max_tokens)
+        ensure_usable(response.stop_reason, self._max_tokens)
 
         payload = next(
             (block.input for block in response.content if block.type == "tool_use"), None

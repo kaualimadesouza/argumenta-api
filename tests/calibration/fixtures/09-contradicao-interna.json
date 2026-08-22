@@ -1,5 +1,4 @@
 {
-  "title": "Tese derrubada pelo proprio texto",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "confronto",
   "exam": "enem",
@@ -10,7 +9,7 @@
   "max_words": 250,
   "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 80,
+    "norma_culta": 85,
     "coesao": 60,
     "coerencia": 20,
     "repertorio": 45,

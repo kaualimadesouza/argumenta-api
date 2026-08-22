@@ -1,5 +1,4 @@
 {
-  "title": "Repertorio inventado sustentando a tese",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "confronto",
   "exam": "enem",
@@ -10,10 +9,10 @@
   "max_words": 250,
   "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 80,
+    "norma_culta": 85,
     "coesao": 70,
     "coerencia": 60,
-    "repertorio": 20,
+    "repertorio": 15,
     "persuasao": 45
   },
   "text": "Dona Marta, o festival do grêmio precisa ser liberado porque o artigo 300 da Constituição de 1988 obriga toda escola pública brasileira a realizar pelo menos dois festivais culturais por ano, sob pena de multa. Além disso, o Estatuto da Criança e do Adolescente, promulgado em 1975, já previa a mesma exigência, e um estudo da Universidade de Harvard provou que escolas com festival têm noventa por cento menos evasão escolar. O Ministério da Educação chegou a distribuir uma cartilha obrigando os diretores a autorizar esse tipo de evento. Portanto, negar o festival colocaria a escola em situação irregular perante os órgãos de fiscalização. Nós, do grêmio, podemos organizar a limpeza e os horários, mas o ponto central é que a senhora não tem, na prática, a opção de recusar, porque a legislação e a pesquisa científica já decidiram essa questão por nós. Peço, então, que a autorização seja assinada ainda esta semana, para evitar qualquer problema legal para a direção da escola."

@@ -1,5 +1,6 @@
 import anthropic
 
+from argumenta.adapters.llm.contract import Effort, ensure_usable
 from argumenta.adapters.llm.prompts.reaction_v1 import (
     CONVINCED_INSTRUCTION,
     PROMPT_VERSION,
@@ -7,7 +8,6 @@ from argumenta.adapters.llm.prompts.reaction_v1 import (
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
-from argumenta.adapters.llm.responses import Effort, ensure_not_truncated
 from argumenta.application.reactions.ports import ReactionRequest, ReactionText
 from argumenta.domain.enums import Verdict
 from argumenta.domain.errors import EvaluationFailedError
@@ -57,7 +57,7 @@ class ClaudeReactionEngine:
         except anthropic.AnthropicError as error:
             raise EvaluationFailedError(str(error)) from error
 
-        ensure_not_truncated(response.stop_reason, self._max_tokens)
+        ensure_usable(response.stop_reason, self._max_tokens)
         body = "".join(block.text for block in response.content if block.type == "text").strip()
         if not body:
             raise EvaluationFailedError("reaction engine returned no text")

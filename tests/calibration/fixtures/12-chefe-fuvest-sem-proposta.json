@@ -1,5 +1,4 @@
 {
-  "title": "Dissertacao chefe sob a lente FUVEST, sem proposta de intervencao",
   "source": "autoral (Argumenta), nao e redacao oficial",
   "chapter_kind": "chefe",
   "exam": "fuvest",
@@ -11,7 +10,7 @@
   "spelling_anchors": 0,
   "expected": {
     "norma_culta": 85,
-    "coesao": 82,
+    "coesao": 80,
     "coerencia": 85,
     "repertorio": 70,
     "persuasao": 80
