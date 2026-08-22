@@ -1,7 +1,7 @@
 """store the exam lens with each evaluation
 
 Revision ID: bfb23f323d3f
-Revises: c3127ce63329
+Revises: 436f0e73948f
 Create Date: 2026-08-21 22:19:40.217702
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = 'bfb23f323d3f'  # pragma: allowlist secret
-down_revision: str | None = 'c3127ce63329'
+down_revision: str | None = '436f0e73948f'  # pragma: allowlist secret
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
