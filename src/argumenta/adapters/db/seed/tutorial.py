@@ -1,39 +1,16 @@
-"""Seed of the tutorial story "O Grêmio" (PRD section 6, DER content domain).
+"""Seed of the tutorial story "O Grêmio" (PRD section 6, DER content domain)."""
 
-Idempotent by slug: when the story already exists (not soft-deleted) nothing is
-touched, so the seed is safe to run on every deploy.
-"""
-
-from dataclasses import dataclass, field
-
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from argumenta.adapters.db.models import Chapter, ChapterBeat, Character, Story
-from argumenta.domain.enums import BeatType, Branch, ChapterKind, ContentStatus
+from argumenta.adapters.db.seed.story import (
+    BeatSeed,
+    ChapterSeed,
+    StorySeed,
+    insert_story,
+)
+from argumenta.domain.enums import BeatType, Branch, ChapterKind
 
 STORY_SLUG = "o-gremio"
-
-
-@dataclass(frozen=True)
-class BeatSeed:
-    branch: Branch
-    beat_type: BeatType
-    body: str
-    character: str | None = None
-
-
-@dataclass(frozen=True)
-class ChapterSeed:
-    kind: ChapterKind
-    title: str
-    objective: str
-    antagonist: str
-    min_words: int
-    max_words: int
-    evaluator_brief: str
-    beats: tuple[BeatSeed, ...] = field(default_factory=tuple)
-
 
 CHARACTERS: dict[str, str] = {
     "Dona Marta": (
@@ -340,62 +317,21 @@ def _chapters() -> tuple[ChapterSeed, ...]:
 
 def seed_tutorial(session: Session) -> bool:
     """Insert the whole tutorial; returns False when it already exists."""
-    existing = session.scalar(
-        select(Story.id).where(Story.slug == STORY_SLUG, Story.deleted_at.is_(None))
-    )
-    if existing is not None:
-        return False
-
-    story = Story(
-        slug=STORY_SLUG,
-        title="O Grêmio",
-        synopsis=(
-            "O festival cultural do colégio foi cancelado de última hora. Como novo "
-            "presidente do grêmio, você vai ter que convencer, por escrito, cada "
-            "pessoa que pode salvar o evento."
+    return insert_story(
+        session,
+        StorySeed(
+            slug=STORY_SLUG,
+            title="O Grêmio",
+            synopsis=(
+                "O festival cultural do colégio foi cancelado de última hora. Como novo "
+                "presidente do grêmio, você vai ter que convencer, por escrito, cada "
+                "pessoa que pode salvar o evento."
+            ),
+            position=1,
+            is_tutorial=True,
+            dimension_floor=40,
+            min_average=50,
+            characters=CHARACTERS,
+            chapters=_chapters(),
         ),
-        position=1,
-        is_tutorial=True,
-        dimension_floor=40,
-        min_average=50,
-        status=ContentStatus.PUBLISHED,
     )
-    session.add(story)
-    session.flush()
-
-    characters: dict[str, Character] = {}
-    for name, persona in CHARACTERS.items():
-        character = Character(story_id=story.id, name=name, persona_brief=persona)
-        session.add(character)
-        characters[name] = character
-    session.flush()
-
-    for position, chapter_seed in enumerate(_chapters(), start=1):
-        chapter = Chapter(
-            story_id=story.id,
-            position=position,
-            kind=chapter_seed.kind,
-            title=chapter_seed.title,
-            objective=chapter_seed.objective,
-            antagonist_id=characters[chapter_seed.antagonist].id,
-            min_words=chapter_seed.min_words,
-            max_words=chapter_seed.max_words,
-            evaluator_brief=chapter_seed.evaluator_brief,
-        )
-        session.add(chapter)
-        session.flush()
-        branch_positions: dict[Branch, int] = {}
-        for beat in chapter_seed.beats:
-            branch_positions[beat.branch] = branch_positions.get(beat.branch, 0) + 1
-            session.add(
-                ChapterBeat(
-                    chapter_id=chapter.id,
-                    branch=beat.branch,
-                    position=branch_positions[beat.branch],
-                    beat_type=beat.beat_type,
-                    character_id=(characters[beat.character].id if beat.character else None),
-                    body=beat.body,
-                )
-            )
-    session.flush()
-    return True
