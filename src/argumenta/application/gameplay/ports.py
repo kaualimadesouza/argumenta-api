@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
-from argumenta.domain.enums import ChapterStatus, SubmissionContext
+from argumenta.domain.enums import ChapterStatus, Exam, SubmissionContext
 from argumenta.domain.evaluation import EvaluationOutcome, EvaluationRuler
+from argumenta.domain.lenses import LensView
 from argumenta.domain.submission import ChapterEvaluationContext
 
 
@@ -30,16 +31,24 @@ class EvaluationContextRepository(Protocol):
     def get_context(self, chapter_id: uuid.UUID) -> ChapterEvaluationContext | None: ...
 
 
+class ActiveExamReader(Protocol):
+    """The single thing gameplay needs to know about the account: which lens
+    the student reads their correction in. None until they pick a target."""
+
+    def active_exam(self, user_id: uuid.UUID) -> Exam | None: ...
+
+
 class SubmissionRepository(Protocol):
     def store(
         self,
         submission: NewSubmission,
         outcome: EvaluationOutcome,
         ruler: EvaluationRuler,
+        lens: LensView,
     ) -> StoredEvaluation:
-        """Persists submission + evaluation (with the ruler frozen into it) +
-        scores + annotations in the current transaction; attempt_number is the
-        next one for the user/chapter pair."""
+        """Persists submission + evaluation (with the ruler and the lens frozen
+        into it) + scores + annotations in the current transaction;
+        attempt_number is the next one for the user/chapter pair."""
         ...
 
 

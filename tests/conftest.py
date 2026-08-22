@@ -100,24 +100,31 @@ class ScriptedEngine:
         "approved": {},
         "failed_technical": {Dimension.NORMA_CULTA: 20},
         "failed_persuasion": {Dimension.PERSUASAO: 20},
+        "weak_proposal": {Dimension.PROPOSTA_INTERVENCAO: 10},
     }
+    BASE_DIMENSIONS: ClassVar[tuple[Dimension, ...]] = (
+        Dimension.NORMA_CULTA,
+        Dimension.COESAO,
+        Dimension.COERENCIA,
+        Dimension.REPERTORIO,
+        Dimension.PERSUASAO,
+    )
 
     def __init__(self) -> None:
         self.scripted = "approved"
         self.calls: list[EngineRequest] = []
+        self.ignore_required_dimensions = False
+        """A misbehaving engine: answers the base five whatever was asked."""
 
     def evaluate(self, request: EngineRequest) -> EngineResult:
         self.calls.append(request)
         overrides = self.PROFILES[self.scripted]
+        asked = (
+            self.BASE_DIMENSIONS if self.ignore_required_dimensions else request.required_dimensions
+        )
         scores = tuple(
             DimensionScore(dimension=d, score=overrides.get(d, 80), evidence="trecho")
-            for d in (
-                Dimension.NORMA_CULTA,
-                Dimension.COESAO,
-                Dimension.COERENCIA,
-                Dimension.REPERTORIO,
-                Dimension.PERSUASAO,
-            )
+            for d in asked
         )
         return EngineResult(
             scores=scores,
@@ -158,3 +165,23 @@ def game(
 def submit_text(client: TestClient, chapter_id: uuid.UUID, body: str = TEXT_130_WORDS) -> Response:
     response: Response = client.post(f"/chapters/{chapter_id}/submissions", json={"body": body})
     return response
+
+
+@pytest.fixture
+def boss_game(
+    game: tuple[TestClient, uuid.UUID],
+    engine_double: ScriptedEngine,
+    db_engine: Engine,
+) -> tuple[TestClient, uuid.UUID]:
+    """Walks the tutorial up to the boss chapter, which the student can only
+    reach by passing the two confronto chapters before it."""
+    client, chapter_id = game
+    engine_double.scripted = "approved"
+    for position in (1, 2):
+        assert submit_text(client, chapter_id).status_code == 201
+        assert client.get("/track").status_code == 200
+        with Session(db_engine) as session:
+            next_id = session.scalar(select(Chapter.id).where(Chapter.position == position + 1))
+        assert next_id is not None
+        chapter_id = next_id
+    return client, chapter_id

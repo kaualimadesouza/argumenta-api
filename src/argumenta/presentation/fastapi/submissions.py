@@ -14,9 +14,11 @@ from argumenta.domain.enums import (
     AnnotationType,
     ChapterStatus,
     Dimension,
+    Exam,
     Severity,
     Verdict,
 )
+from argumenta.domain.lenses import ScaleSource
 from argumenta.presentation.fastapi.dependencies import (
     CurrentUserId,
     get_draft_repository,
@@ -54,6 +56,27 @@ class AnnotationResponse(BaseModel):
     priority: int
 
 
+class LensCriterionResponse(BaseModel):
+    code: str
+    label: str
+    score: int
+    scale_max: int
+    is_argumenta_extra: bool
+
+
+class LensResponse(BaseModel):
+    """The same internal correction in the scale of the student's exam."""
+
+    exam: Exam
+    version: str
+    criteria: list[LensCriterionResponse]
+    total: int | None
+    total_max: int | None
+    scale_source: ScaleSource
+    """"board" is the exam board's own scale; "argumenta" is our aggregation and
+    must not be rendered as an official grade."""
+
+
 class SubmissionResponse(BaseModel):
     """Layered correction in one call: scoreboard, annotated spans, and the
     'para passar' priorities, plus where the chapter state machine landed."""
@@ -68,6 +91,7 @@ class SubmissionResponse(BaseModel):
     scores: list[ScoreResponse]
     annotations: list[AnnotationResponse]
     para_passar: list[AnnotationResponse]
+    lens: LensResponse
 
 
 class DraftRequest(BaseModel):
@@ -122,6 +146,23 @@ def submit_argument(
         ],
         annotations=annotations,
         para_passar=sorted((a for a in annotations if a.priority <= 3), key=lambda a: a.priority),
+        lens=LensResponse(
+            exam=result.lens.exam,
+            version=result.lens.version,
+            criteria=[
+                LensCriterionResponse(
+                    code=criterion.code,
+                    label=criterion.label,
+                    score=criterion.score,
+                    scale_max=criterion.scale_max,
+                    is_argumenta_extra=criterion.is_argumenta_extra,
+                )
+                for criterion in result.lens.criteria
+            ],
+            total=result.lens.total,
+            total_max=result.lens.total_max,
+            scale_source=result.lens.scale_source,
+        ),
     )
 
 

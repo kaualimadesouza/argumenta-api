@@ -7,6 +7,7 @@ from argumenta.application.evaluation.use_cases import (
     EvaluateArgumentUseCase,
 )
 from argumenta.application.gameplay.ports import (
+    ActiveExamReader,
     DailyActivityWriter,
     DraftRepository,
     EvaluationContextRepository,
@@ -17,6 +18,12 @@ from argumenta.application.gameplay.ports import (
 from argumenta.domain.enums import ChapterStatus, Verdict
 from argumenta.domain.errors import ChapterNotFoundError, WordCountOutOfRangeError
 from argumenta.domain.evaluation import EvaluationOutcome, EvaluationRuler
+from argumenta.domain.lenses import (
+    DEFAULT_EXAM,
+    LensView,
+    grading_spec,
+    project_lens,
+)
 from argumenta.domain.submission import (
     DAILY_SUBMISSION_LIMIT,
     count_words,
@@ -42,6 +49,8 @@ class SubmissionResult:
     chapter_status: ChapterStatus
     ruler: EvaluationRuler
     outcome: EvaluationOutcome
+    lens: LensView
+    """The same internal correction, projected into the student's exam lens."""
 
 
 class SubmitArgumentUseCase:
@@ -57,6 +66,7 @@ class SubmitArgumentUseCase:
         activity: DailyActivityWriter,
         drafts: DraftRepository,
         evaluate: EvaluateArgumentUseCase,
+        exams: ActiveExamReader,
     ) -> None:
         self._contexts = contexts
         self._submissions = submissions
@@ -64,6 +74,7 @@ class SubmitArgumentUseCase:
         self._activity = activity
         self._drafts = drafts
         self._evaluate = evaluate
+        self._exams = exams
 
     def execute(self, request: SubmitArgument) -> SubmissionResult:
         context = self._contexts.get_context(request.chapter_id)
@@ -85,6 +96,7 @@ class SubmitArgumentUseCase:
         # transaction if anything after it fails
         self._activity.register_submission(request.user_id, now.date(), DAILY_SUBMISSION_LIMIT)
 
+        exam = self._exams.active_exam(request.user_id) or DEFAULT_EXAM
         outcome = self._evaluate.execute(
             EvaluateArgument(
                 text=request.body,
@@ -94,9 +106,11 @@ class SubmitArgumentUseCase:
                 min_words=chapter.min_words,
                 max_words=chapter.max_words,
                 ruler=context.ruler,
+                spec=grading_spec(chapter.kind, exam),
             )
         )
 
+        lens = project_lens(outcome.scores, exam, chapter.kind)
         stored = self._submissions.store(
             NewSubmission(
                 user_id=request.user_id,
@@ -109,6 +123,7 @@ class SubmitArgumentUseCase:
             ),
             outcome,
             context.ruler,
+            lens,
         )
 
         new_status = next_status_for(outcome.verdict)
@@ -131,4 +146,5 @@ class SubmitArgumentUseCase:
             chapter_status=new_status,
             ruler=context.ruler,
             outcome=outcome,
+            lens=lens,
         )

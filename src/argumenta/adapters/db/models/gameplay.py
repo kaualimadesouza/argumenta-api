@@ -20,6 +20,7 @@ from argumenta.domain.enums import (
     AnnotationType,
     ChapterStatus,
     Dimension,
+    Exam,
     ReactionBeat,
     Severity,
     SubmissionContext,
@@ -84,6 +85,12 @@ class Evaluation(UuidPkMixin, AuditMixin, Base):
     )
     model: Mapped[str] = mapped_column(Text, nullable=False)
     prompt_version: Mapped[str] = mapped_column(Text, nullable=False)
+    lens_version: Mapped[str | None] = mapped_column(
+        Text, nullable=True, comment="mapeamento de exibicao usado no envio"
+    )
+    exam: Mapped[Exam | None] = mapped_column(
+        db_enum(Exam, "exam"), nullable=True, comment="lente ativa do aluno no envio"
+    )
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

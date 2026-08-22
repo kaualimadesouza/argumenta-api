@@ -6,7 +6,9 @@ from anthropic.types import ToolChoiceToolParam, ToolParam
 from pydantic import BaseModel, Field, ValidationError
 
 from argumenta.adapters.llm.prompts.evaluation_v1 import (
+    FULL_ESSAY_RULE,
     PROMPT_VERSION,
+    SCENE_TEXT_RULE,
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
@@ -14,14 +16,6 @@ from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
 from argumenta.domain.evaluation import Annotation, DimensionScore
-
-_REQUIRED_DIMENSIONS = (
-    Dimension.NORMA_CULTA,
-    Dimension.COESAO,
-    Dimension.COERENCIA,
-    Dimension.REPERTORIO,
-    Dimension.PERSUASAO,
-)
 
 
 class ScoreOutput(BaseModel):
@@ -59,16 +53,13 @@ def _tool_definition() -> ToolParam:
 
 
 def parse_engine_output(payload: dict[str, Any], text: str) -> EvaluationOutput:
-    """Validate the tool payload: pydantic contract, one score per dimension,
-    spans inside the text. Raises EvaluationFailedError on violations."""
+    """Validate the tool payload: pydantic contract and spans inside the text.
+    Which dimensions were required is checked once, in the use case, so every
+    engine is held to it. Raises EvaluationFailedError."""
     try:
         output = EvaluationOutput.model_validate(payload)
     except ValidationError as error:
         raise EvaluationFailedError(f"engine output rejected: {error}") from error
-
-    seen = {score.dimension for score in output.scores}
-    if seen != set(_REQUIRED_DIMENSIONS) or len(output.scores) != len(_REQUIRED_DIMENSIONS):
-        raise EvaluationFailedError(f"engine must score each dimension exactly once, got {seen}")
 
     for annotation in output.annotations:
         if annotation.span_end <= annotation.span_start or annotation.span_end > len(text):
@@ -86,6 +77,10 @@ def _format_anchors(request: EngineRequest) -> str:
         f'- "{anchor.word}" em [{anchor.span_start}, {anchor.span_end})'
         for anchor in request.spelling_anchors
     )
+
+
+def _format_dimensions(required: tuple[Dimension, ...]) -> str:
+    return "\n".join(f"- {dimension.value}" for dimension in required)
 
 
 class ClaudeEvaluationEngine:
@@ -116,6 +111,8 @@ class ClaudeEvaluationEngine:
                             min_words=request.min_words,
                             max_words=request.max_words,
                             anchors=_format_anchors(request),
+                            dimensions=_format_dimensions(request.required_dimensions),
+                            format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
                             text=request.text,
                         ),
                     }

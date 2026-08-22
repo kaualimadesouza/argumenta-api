@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+from argumenta.domain.enums import Dimension
 from argumenta.domain.evaluation import Annotation, DimensionScore, SpellingAnchor
 
 
@@ -14,6 +15,10 @@ class EngineRequest:
     max_words: int
     spelling_anchors: tuple[SpellingAnchor, ...]
     """Deterministic pt-BR unknown words; the LLM classifies and explains them."""
+    required_dimensions: tuple[Dimension, ...]
+    """Exactly the dimensions the engine must score, per chapter kind and lens."""
+    full_essay: bool
+    """Boss chapters ask for a complete dissertative-argumentative essay."""
 
 
 @dataclass(frozen=True)

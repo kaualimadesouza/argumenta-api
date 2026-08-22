@@ -54,6 +54,8 @@ correção instantânea transforma treino em hábito.
 | 24 | Custo LLM | Teto mensal configurável com alerta e bloqueio gracioso, medido pelos tokens em `evaluations` |
 | 25 | Ilustrações | Artes paper-cut em SVG no estilo dos mockups até o produto validar; ilustrador humano depois |
 | 26 | Régua inicial | Tutorial piso 40 / média 50; história ENEM 50/60; história FUVEST 55/65; chefe 250 a 450 palavras (calibrar jogando) |
+| 27 | Lente e veredito | A lente nunca move o veredito: ele sai das 5 dimensoes do jogo. A proposta de intervencao do ENEM e pontuada e exibida (C5) no capitulo-chefe, fora da media |
+| 28 | Escala FUVEST | Eixos ficam na escala interna 0-100 e o total e marcado como agregacao Argumenta (`scale_source`), nao da banca, ate a suite de calibracao fechar a conversao |
 
 ## 4. Loop central
 
@@ -221,7 +223,8 @@ Riscos:
 Pendências:
 
 - Nome final e domínio.
-- Escala FUVEST exata na lente de apresentação.
+- Escala FUVEST exata na lente de apresentação (decisão 28: por ora 0-100 marcado como
+  agregação Argumenta, para o app nunca exibir número nosso como nota de banca).
 - Calibração fina dos pisos e médias jogando (régua inicial proposta na decisão 26).
 - Professor de redação revisor (depois do beta).
 - Hospedagem: decisão adiada. Análise feita em 2026-08-20: VPS recomendada

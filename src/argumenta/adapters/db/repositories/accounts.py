@@ -94,6 +94,15 @@ class SqlAlchemyExamTargetRepository:
         )
         return [_to_exam_target(row) for row in rows]
 
+    def active_exam(self, user_id: uuid.UUID) -> Exam | None:
+        return self._session.scalar(
+            select(UserExamTarget.exam).where(
+                UserExamTarget.user_id == user_id,
+                UserExamTarget.is_active.is_(True),
+                UserExamTarget.deleted_at.is_(None),
+            )
+        )
+
     def get(self, user_id: uuid.UUID, target_id: uuid.UUID) -> ExamTarget | None:
         row = self._session.scalar(
             select(UserExamTarget).where(
