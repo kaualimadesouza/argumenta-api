@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from argumenta.application.accounts.ports import RateLimiter
+from argumenta.application.ports import RateLimiter
 from argumenta.application.telemetry.ports import TelemetryRepository
 from argumenta.domain.errors import SubmissionNotFoundError, TooManyAttemptsError
-from argumenta.domain.telemetry import TelemetryRecord, ensure_batch_is_recordable
+from argumenta.domain.telemetry import RecordableBatch, TelemetryRecord, recordable
 
 
 class RecordTelemetryEventsUseCase:
@@ -18,28 +18,29 @@ class RecordTelemetryEventsUseCase:
         self._events = events
         self._limiter = limiter
 
-    def execute(self, user_id: uuid.UUID, records: Sequence[TelemetryRecord]) -> int:
-        if not records:
-            return 0
+    def execute(self, user_id: uuid.UUID, records: Sequence[TelemetryRecord]) -> RecordableBatch:
+        """Returns what was filed and what was thrown away, so the client can
+        stop resending a buffer the server will never keep."""
         if not self._limiter.check(f"telemetry:{user_id}"):
             raise TooManyAttemptsError("too many telemetry batches, slow down")
-        batch = tuple(records)
-        ensure_batch_is_recordable(batch, datetime.now(tz=UTC))
-        stored = self._attach_owned_submissions(user_id, batch)
+        batch = recordable(tuple(records), datetime.now(tz=UTC))
+        if not batch.records:
+            return batch
+        stored = self._attach_owned_submissions(user_id, batch.records)
         self._events.store(user_id, stored)
-        return len(stored)
+        return RecordableBatch(records=stored, dropped=batch.dropped)
 
     def _attach_owned_submissions(
         self, user_id: uuid.UUID, batch: tuple[TelemetryRecord, ...]
     ) -> tuple[TelemetryRecord, ...]:
         """A reference to a submission that is not the user's refuses the whole
-        batch; one to a submission of theirs that was deleted is dropped, and
-        the event is still recorded."""
+        batch; one to a submission of theirs that was deleted loses the
+        reference, and the event is still recorded."""
         referenced = {record.submission_id for record in batch if record.submission_id is not None}
         if not referenced:
             return batch
         ownership = self._events.classify_submissions(user_id, referenced)
-        unknown = referenced - ownership.active - ownership.retired
+        unknown = referenced - ownership.owned
         if unknown:
             raise SubmissionNotFoundError(
                 "telemetry pointed at a submission that is not this user's"

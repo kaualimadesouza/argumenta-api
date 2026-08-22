@@ -1,14 +1,18 @@
 import uuid
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from argumenta.application.telemetry.use_cases import RecordTelemetryEventsUseCase
 from argumenta.domain.enums import TelemetryEventType
 from argumenta.domain.telemetry import (
-    MAX_EVENTS_PER_BATCH,
+    MAX_KEYSTROKES,
+    MAX_PASTE_CHARS,
+    MAX_PASTE_WORDS,
+    MAX_SCREEN_LENGTH,
+    MAX_TYPING_MS,
+    SCREEN_PATTERN,
     Paste,
     ScreenView,
     TelemetryPayload,
@@ -24,27 +28,25 @@ router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
 TelemetryUseCase = Annotated[RecordTelemetryEventsUseCase, Depends(get_record_telemetry_use_case)]
 
-TRANSPORT_MAX_EVENTS = 10 * MAX_EVENTS_PER_BATCH
-"""Transport bound, an order of magnitude above the product rule, so a body
-that is absurd is refused before it is turned into objects. How many events
-belong in one batch stays a rule in the domain, and stays reachable."""
-
 
 class _EventFields(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    """No unknown fields: the payload of an event is a shape this system knows,
-    and an extra key is exactly where the student's text would arrive."""
+    """No unknown fields, and every field bounded: an extra key is exactly where
+    the student's text would arrive, and this is the only body in the product a
+    client sends unprompted."""
 
-    occurred_at: datetime
-    """When it happened on the client. Required: without it the batch only
-    carries flush time, and typing rhythm stops being reconstructable."""
+    model_config = ConfigDict(extra="forbid")
+
+    occurred_at: AwareDatetime
+    """When it happened on the client, offset required. A naive timestamp is a
+    client bug (it would be read in the server timezone), and without any the
+    batch only carries flush time, so rhythm stops being reconstructable."""
     submission_id: uuid.UUID | None = None
 
 
 class PasteEventRequest(_EventFields):
     event_type: Literal[TelemetryEventType.PASTE]
-    chars: int = Field(ge=1, le=100_000)
-    words: int | None = Field(default=None, ge=0, le=20_000)
+    chars: int = Field(ge=1, le=MAX_PASTE_CHARS)
+    words: int | None = Field(default=None, ge=0, le=MAX_PASTE_WORDS)
 
     def payload(self) -> TelemetryPayload:
         return Paste(chars=self.chars, words=self.words)
@@ -52,9 +54,9 @@ class PasteEventRequest(_EventFields):
 
 class TypingStatsEventRequest(_EventFields):
     event_type: Literal[TelemetryEventType.TYPING_STATS]
-    ms: int = Field(ge=0, le=86_400_000)
-    keystrokes: int = Field(ge=0, le=1_000_000)
-    backspaces: int | None = Field(default=None, ge=0, le=1_000_000)
+    ms: int = Field(ge=0, le=MAX_TYPING_MS)
+    keystrokes: int = Field(ge=0, le=MAX_KEYSTROKES)
+    backspaces: int | None = Field(default=None, ge=0, le=MAX_KEYSTROKES)
 
     def payload(self) -> TelemetryPayload:
         return TypingStats(ms=self.ms, keystrokes=self.keystrokes, backspaces=self.backspaces)
@@ -62,8 +64,7 @@ class TypingStatsEventRequest(_EventFields):
 
 class ScreenViewEventRequest(_EventFields):
     event_type: Literal[TelemetryEventType.SCREEN_VIEW]
-    screen: str = Field(min_length=1, max_length=40, pattern=r"^[a-z0-9][a-z0-9_/-]*$")
-    """A slug, not a label: bounded and unable to carry prose."""
+    screen: str = Field(min_length=1, max_length=MAX_SCREEN_LENGTH, pattern=SCREEN_PATTERN)
 
     def payload(self) -> TelemetryPayload:
         return ScreenView(screen=self.screen)
@@ -76,14 +77,27 @@ TelemetryEventRequest = Annotated[
 
 
 class TelemetryBatchRequest(BaseModel):
-    events: list[TelemetryEventRequest] = Field(max_length=TRANSPORT_MAX_EVENTS)
+    events: list[TelemetryEventRequest]
 
 
 class TelemetryBatchResponse(BaseModel):
     recorded: int
+    dropped: int = Field(
+        description=(
+            "events thrown away because their client date cannot be a clock error; "
+            "resending them will not change the answer"
+        )
+    )
 
 
-@router.post("/events", status_code=201)
+@router.post(
+    "/events",
+    status_code=201,
+    responses={
+        413: {"description": "batch over the limit, or a body over the global cap"},
+        429: {"description": "too many batches for this student"},
+    },
+)
 def record_events(
     request: TelemetryBatchRequest,
     user_id: CurrentUserId,
@@ -91,7 +105,7 @@ def record_events(
 ) -> TelemetryBatchResponse:
     """Anti-cheat collection, stored and never blocking: nothing reported here
     changes the student's submission or their grade (PRD decision 12)."""
-    recorded = use_case.execute(
+    batch = use_case.execute(
         user_id,
         [
             TelemetryRecord(
@@ -102,4 +116,4 @@ def record_events(
             for event in request.events
         ],
     )
-    return TelemetryBatchResponse(recorded=recorded)
+    return TelemetryBatchResponse(recorded=len(batch.records), dropped=batch.dropped)

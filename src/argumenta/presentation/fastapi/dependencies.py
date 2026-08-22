@@ -33,10 +33,11 @@ from argumenta.adapters.security.argon2_hasher import Argon2PasswordHasher
 from argumenta.adapters.security.jwt_tokens import JwtTokenService
 from argumenta.adapters.security.rate_limiter import SlidingWindowRateLimiter
 from argumenta.adapters.spelling.spylls_checker import SpyllsSpellChecker
-from argumenta.application.accounts.ports import GoogleIdentityGateway, RateLimiter
+from argumenta.application.accounts.ports import GoogleIdentityGateway
 from argumenta.application.evaluation.ports import EvaluationEngine
 from argumenta.application.evaluation.use_cases import EvaluateArgumentUseCase
 from argumenta.application.gameplay.use_cases import SubmitArgumentUseCase
+from argumenta.application.ports import RateLimiter
 from argumenta.application.reactions.ports import ReactionEngine
 from argumenta.application.reactions.use_cases import GetCharacterReactionUseCase
 from argumenta.application.telemetry.use_cases import RecordTelemetryEventsUseCase
@@ -87,16 +88,18 @@ def get_token_service() -> JwtTokenService:
 
 
 @lru_cache
-def _rate_limiter_singleton() -> SlidingWindowRateLimiter:
-    settings = get_settings()
-    return SlidingWindowRateLimiter(
-        max_attempts=settings.login_rate_limit_attempts,
-        window_seconds=settings.login_rate_limit_window_seconds,
-    )
+def _limiter(name: str, max_attempts: int, window_seconds: int) -> SlidingWindowRateLimiter:
+    """One sliding window per process and per name: in memory is enough for a
+    single container beta, and with N workers the effective limit is N times
+    this one (the limiter says so itself)."""
+    return SlidingWindowRateLimiter(max_attempts=max_attempts, window_seconds=window_seconds)
 
 
 def get_rate_limiter() -> RateLimiter:
-    return _rate_limiter_singleton()
+    settings = get_settings()
+    return _limiter(
+        "login", settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds
+    )
 
 
 def get_google_gateway() -> GoogleIdentityGateway:
@@ -232,19 +235,13 @@ def get_telemetry_repository(session: DbSession) -> SqlAlchemyTelemetryRepositor
     return SqlAlchemyTelemetryRepository(session)
 
 
-@lru_cache
-def _telemetry_limiter_singleton() -> SlidingWindowRateLimiter:
-    """One window per process, like the login limiter: in memory is enough for
-    a single container beta (the limiter says so itself)."""
-    settings = get_settings()
-    return SlidingWindowRateLimiter(
-        max_attempts=settings.telemetry_rate_limit_batches,
-        window_seconds=settings.telemetry_rate_limit_window_seconds,
-    )
-
-
 def get_telemetry_rate_limiter() -> RateLimiter:
-    return _telemetry_limiter_singleton()
+    settings = get_settings()
+    return _limiter(
+        "telemetry",
+        settings.telemetry_rate_limit_batches,
+        settings.telemetry_rate_limit_window_seconds,
+    )
 
 
 def get_record_telemetry_use_case(

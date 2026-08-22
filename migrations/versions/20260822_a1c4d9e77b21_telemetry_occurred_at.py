@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = 'a1c4d9e77b21'  # pragma: allowlist secret
-down_revision: str | None = 'bfb23f323d3f'  # pragma: allowlist secret
+down_revision: str | None = '9e16860b95a2'  # pragma: allowlist secret
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

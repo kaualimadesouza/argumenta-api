@@ -1,11 +1,10 @@
-from typing import Any
-
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from argumenta import __version__
 from argumenta.domain import errors
 from argumenta.presentation.fastapi.auth import router as auth_router
+from argumenta.presentation.fastapi.body_limit import LimitRequestBody
 from argumenta.presentation.fastapi.health import router as health_router
 from argumenta.presentation.fastapi.me import router as me_router
 from argumenta.presentation.fastapi.reactions import router as reactions_router
@@ -31,23 +30,12 @@ _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EvaluationFailedError: 502,
     errors.SubmissionNotFoundError: 404,
     errors.TelemetryBatchTooLargeError: 413,
-    errors.TelemetryTimestampError: 422,
 }
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Argumenta API", version=__version__)
-    max_bytes = get_settings().max_request_bytes
-
-    @app.middleware("http")
-    async def refuse_oversized_bodies(request: Request, call_next: Any) -> Response:
-        """Refused on the header, before anything is deserialized: parsing a
-        60 MB batch just to answer 413 costs hundreds of megabytes of RSS, and
-        the worker that dies takes the corrections down with it."""
-        if _declared_length(request) > max_bytes:
-            return JSONResponse(status_code=413, content={"detail": "RequestTooLarge"})
-        response: Response = await call_next(request)
-        return response
+    app.add_middleware(LimitRequestBody, max_bytes=get_settings().max_request_bytes)
 
     app.include_router(health_router)
     app.include_router(auth_router)
@@ -63,15 +51,6 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=status_code, content={"detail": type(exc).__name__})
 
     return app
-
-
-def _declared_length(request: Request) -> int:
-    """A body with no Content-Length (chunked) reads as zero here and is bounded
-    instead by the transport cap on the request model."""
-    declared = request.headers.get("content-length")
-    if declared is None or not declared.isdigit():
-        return 0
-    return int(declared)
 
 
 app = create_app()

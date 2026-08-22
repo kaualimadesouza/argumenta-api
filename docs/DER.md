@@ -422,9 +422,16 @@ Notas:
   incrementa `submissions_count` e rejeita acima do teto.
 - Streak atual e recorde derivam de `daily_activity` (dias consecutivos com
   `submissions_count > 0`); nada denormalizado no MVP.
-- Telemetria anti-cola sem bloqueio (decisão do PRD): eventos `paste` e
-  `typing_stats` com payload livre em JSONB, o único JSONB do modelo, porque o
-  formato é heterogêneo por natureza.
+- Telemetria anti-cola sem bloqueio (decisão do PRD): `paste`, `typing_stats` e
+  `screen_view` no único JSONB do modelo. O payload é heterogêneo entre tipos de
+  evento, mas **não é livre**: cada `event_type` tem uma forma fechada de
+  contadores (e um slug de tela), validada na borda, o que mantém texto do aluno
+  fora do JSONB.
+- `submissions.typing_ms` e `submissions.paste_count` são o resumo que o cliente
+  anexa ao texto entregue, e é o que a correção enxerga; `telemetry_events` é o
+  fluxo bruto para análise. Os dois podem divergir (o resumo é um número que o
+  cliente calculou, o fluxo é o que ele conseguiu enviar) e, quando divergirem,
+  o resumo é o que vale para o produto.
 
 ## Enums
 
@@ -461,7 +468,10 @@ linha logicamente apagada sem colisão.
   parcial, uma reação por beat da submissão.
 - `evaluation_scores (evaluation_id)` e, para o gráfico de evolução,
   `evaluation_scores (dimension)` combinado com join em `evaluations.created_at`.
-- `telemetry_events (user_id, created_at)`: consultas por aluno e período.
+- `telemetry_events (user_id, created_at)`: consultas por aluno e período, pela
+  hora de chegada. Ritmo se lê por intervalos dentro de um lote, que cabe numa
+  só linha de resultado dessa varredura, então `occurred_at` fica sem índice até
+  existir consulta que ordene por ele (é a tabela de maior volume do modelo).
 - `chapter_beats (chapter_id, branch, position)`: leitura do roteiro em ordem.
 
 ## Decisões de modelagem

@@ -7,7 +7,6 @@ from argumenta.application.accounts.ports import (
     AccountRepository,
     GoogleIdentityGateway,
     PasswordHasher,
-    RateLimiter,
 )
 from argumenta.application.accounts.use_cases import (
     LoginWithEmail,
@@ -17,6 +16,7 @@ from argumenta.application.accounts.use_cases import (
     RegisterWithEmail,
     RegisterWithEmailUseCase,
 )
+from argumenta.application.ports import RateLimiter
 from argumenta.presentation.fastapi.dependencies import (
     AppSettings,
     get_account_repository,

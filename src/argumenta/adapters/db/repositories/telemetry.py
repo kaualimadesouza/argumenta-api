@@ -23,13 +23,13 @@ class SqlAlchemyTelemetryRepository:
             )
         ).all()
         return SubmissionOwnership(
-            active=frozenset(row.id for row in rows if row.deleted_at is None),
+            owned=frozenset(row.id for row in rows),
             retired=frozenset(row.id for row in rows if row.deleted_at is not None),
         )
 
     def store(self, user_id: uuid.UUID, records: Sequence[TelemetryRecord]) -> None:
-        """One INSERT for the whole batch (SQLAlchemy batches the ORM objects
-        into a single statement): fifty buffered events are one round trip."""
+        """SQLAlchemy batches these ORM objects into a single INSERT, so fifty
+        buffered events are one round trip on the busiest endpoint."""
         self._session.add_all(
             [
                 TelemetryEvent(

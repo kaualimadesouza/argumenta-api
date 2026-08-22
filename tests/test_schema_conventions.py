@@ -1,6 +1,6 @@
-"""Guards for the DER v0.6 modeling decisions that autogenerate cannot enforce:
-universal audit columns (decision 6), universal soft delete with partial
-uniques (decision 8) and native enums storing the DER lowercase values."""
+"""Guards for the DER decisions autogenerate cannot enforce: audit columns
+(decision 6), soft delete with partial uniques (decision 8), enums storing the
+DER lowercase values, and the indexes a card asked for by name."""
 
 from sqlalchemy import Enum
 
@@ -71,3 +71,12 @@ def test_enums_store_der_values_not_python_names() -> None:
                     f"{table.name}.{column.name} enum stores {column.type.enums}, "
                     f"expected DER values {expected}"
                 )
+
+
+def test_the_telemetry_events_are_indexed_by_user_and_time() -> None:
+    """Issue #13 asked for this one by name: the highest volume table in the
+    model, read per student and period."""
+    by_name = {str(index.name): index for index in Base.metadata.tables["telemetry_events"].indexes}
+    index = by_name.get("ix_telemetry_events_user_created")
+    assert index is not None, f"missing, found {sorted(by_name)}"
+    assert [column.name for column in index.columns] == ["user_id", "created_at"]

@@ -1,6 +1,7 @@
 """Issue #13: anti-cheat telemetry, tests first (TDD). Collection only: nothing
 punishes a student, and nothing a student reports can hurt the product."""
 
+import json
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -15,16 +16,13 @@ from sqlalchemy.orm import Session
 
 from argumenta.adapters.db.models import Submission, TelemetryEvent
 from argumenta.adapters.security.rate_limiter import SlidingWindowRateLimiter
-from argumenta.domain.errors import (
-    TelemetryBatchTooLargeError,
-    TelemetryTimestampError,
-)
+from argumenta.domain.errors import TelemetryBatchTooLargeError
 from argumenta.domain.telemetry import (
-    MAX_EVENT_AGE,
+    MAX_CLOCK_DRIFT,
     MAX_EVENTS_PER_BATCH,
     Paste,
     TelemetryRecord,
-    ensure_batch_is_recordable,
+    recordable,
 )
 from argumenta.presentation.fastapi.dependencies import get_telemetry_rate_limiter
 from tests.conftest import ScriptedEngine, submit_text
@@ -53,24 +51,35 @@ def _event(event_type: str = "paste", **fields: Any) -> dict[str, Any]:
 
 
 class TestBatchRule:
+    def test_the_product_rules_are_these_numbers(self) -> None:
+        """Pinned, not derived: every test below builds its input from these
+        constants, so all of them stay green if the rule is loosened."""
+        assert MAX_EVENTS_PER_BATCH == 100
+        assert timedelta(days=365) == MAX_CLOCK_DRIFT
+
     def test_a_batch_at_the_limit_is_accepted(self) -> None:
-        ensure_batch_is_recordable(tuple(_record() for _ in range(MAX_EVENTS_PER_BATCH)), NOW)
+        batch = recordable(tuple(_record() for _ in range(100)), NOW)
+
+        assert (len(batch.records), batch.dropped) == (100, 0)
 
     def test_a_batch_over_the_limit_is_refused(self) -> None:
         with pytest.raises(TelemetryBatchTooLargeError):
-            ensure_batch_is_recordable(
-                tuple(_record() for _ in range(MAX_EVENTS_PER_BATCH + 1)), NOW
-            )
+            recordable(tuple(_record() for _ in range(101)), NOW)
 
-    def test_an_event_from_the_future_is_refused(self) -> None:
-        """A clock that far off makes the event useless for ordering, which is
-        the only thing this data is for."""
-        with pytest.raises(TelemetryTimestampError):
-            ensure_batch_is_recordable((_record(NOW + timedelta(hours=1)),), NOW)
+    def test_a_clock_that_runs_fast_is_kept(self) -> None:
+        """A phone six minutes ahead is normal, and rhythm is read from the
+        intervals inside a batch, where a constant offset cancels out."""
+        batch = recordable((_record(NOW + timedelta(minutes=6)),), NOW)
 
-    def test_a_stale_event_is_refused(self) -> None:
-        with pytest.raises(TelemetryTimestampError):
-            ensure_batch_is_recordable((_record(NOW - MAX_EVENT_AGE - timedelta(minutes=1)),), NOW)
+        assert (len(batch.records), batch.dropped) == (1, 0)
+
+    def test_an_impossible_date_is_dropped_alone(self) -> None:
+        """One event of nonsense must not cost the buffer: a device whose clock
+        is wrong keeps being wrong, so refusing the batch loses every event it
+        will ever send."""
+        batch = recordable((_record(datetime(1999, 1, 1, tzinfo=UTC)), _record()), NOW)
+
+        assert (len(batch.records), batch.dropped) == (1, 1)
 
     def test_the_event_type_comes_from_the_payload(self) -> None:
         """So an event cannot claim one type and carry the fields of another."""
@@ -89,7 +98,7 @@ class TestTelemetryEndpoint:
         )
 
         assert response.status_code == 201, response.text
-        assert response.json() == {"recorded": 3}
+        assert response.json() == {"recorded": 3, "dropped": 0}
         with Session(db_engine) as session:
             stored = session.scalars(select(TelemetryEvent).order_by(TelemetryEvent.id)).all()
         assert [row.event_type for row in stored] == ["paste", "typing_stats", "screen_view"]
@@ -202,6 +211,64 @@ class TestTelemetryEndpoint:
         assert response.json()["detail"] == "RequestTooLarge"
         assert _rows(db_engine) == []
 
+    def test_a_naive_timestamp_is_a_client_bug_not_a_guess(
+        self, game: tuple[TestClient, uuid.UUID], db_engine: Engine
+    ) -> None:
+        """Without an offset the server would read it in its own timezone. A
+        shape error is deterministic, so the client dev sees it in development;
+        a wrong clock is not, which is why that one is tolerated instead."""
+        client, _ = game
+
+        response = client.post(
+            "/telemetry/events",
+            json={"events": [_event("paste", occurred_at="2026-08-22T12:00:00")]},
+        )
+
+        assert response.status_code == 422
+        assert _rows(db_engine) == []
+
+    def test_an_impossible_date_does_not_cost_the_rest_of_the_buffer(
+        self, game: tuple[TestClient, uuid.UUID], db_engine: Engine
+    ) -> None:
+        client, _ = game
+
+        response = client.post(
+            "/telemetry/events",
+            json={
+                "events": [
+                    _event("paste", occurred_at="1999-01-01T00:00:00+00:00"),
+                    _event("typing_stats"),
+                ]
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json() == {"recorded": 1, "dropped": 1}
+        assert [row.event_type for row in _rows(db_engine)] == ["typing_stats"]
+
+    def test_a_chunked_body_is_counted_as_it_arrives(
+        self, game: tuple[TestClient, uuid.UUID], db_engine: Engine
+    ) -> None:
+        """Content-Length is a hint a client may not send at all: a streamed
+        body declares nothing, and the parser materializes it before validation
+        or auth, so the bytes have to be counted while they arrive."""
+        client, _ = game
+        payload = json.dumps({"events": [_event("screen_view") for _ in range(30_000)]}).encode()
+
+        def chunks() -> Iterator[bytes]:
+            for start in range(0, len(payload), 64_000):
+                yield payload[start : start + 64_000]
+
+        response = client.post(
+            "/telemetry/events",
+            content=chunks(),
+            headers={"content-type": "application/json"},
+        )
+
+        assert response.status_code == 413
+        assert response.json()["detail"] == "RequestTooLarge"
+        assert _rows(db_engine) == []
+
     def test_an_oversized_batch_is_refused_by_the_domain_rule(
         self, game: tuple[TestClient, uuid.UUID], db_engine: Engine
     ) -> None:
@@ -224,7 +291,7 @@ class TestTelemetryEndpoint:
         response = client.post("/telemetry/events", json={"events": []})
 
         assert response.status_code == 201
-        assert response.json() == {"recorded": 0}
+        assert response.json() == {"recorded": 0, "dropped": 0}
         assert _rows(db_engine) == []
 
     def test_someone_elses_submission_records_nothing(
@@ -296,7 +363,7 @@ class TestTelemetryEndpoint:
         with _telemetry_inserts(db_engine) as statements:
             response = client.post("/telemetry/events", json={"events": events})
 
-        assert response.json() == {"recorded": 50}
+        assert response.json() == {"recorded": 50, "dropped": 0}
         assert len(statements) == 1, f"{len(statements)} INSERTs for one batch"
 
     def test_a_student_cannot_flood_the_only_unbounded_write_they_have(
@@ -313,10 +380,43 @@ class TestTelemetryEndpoint:
         assert second.status_code == 429
         assert len(_rows(db_engine)) == 1
 
+    def test_an_empty_flush_still_spends_a_rate_limit_slot(
+        self, app: FastAPI, game: tuple[TestClient, uuid.UUID]
+    ) -> None:
+        """Otherwise an empty body is a free request forever."""
+        client, _ = game
+        limiter = SlidingWindowRateLimiter(max_attempts=1, window_seconds=60)
+        app.dependency_overrides[get_telemetry_rate_limiter] = lambda: limiter
+
+        first = client.post("/telemetry/events", json={"events": []})
+        second = client.post("/telemetry/events", json={"events": []})
+
+        assert (first.status_code, second.status_code) == (201, 429)
+
     def test_telemetry_requires_a_logged_in_student(self, client: TestClient) -> None:
         response = client.post("/telemetry/events", json={"events": [_event("paste")]})
 
         assert response.status_code == 401
+
+
+class TestGlobalBodyCap:
+    """The cap arrived with telemetry but governs every route, so the routes
+    that already took a big body have to say what happens now."""
+
+    def test_a_draft_over_the_cap_is_refused(self, game: tuple[TestClient, uuid.UUID]) -> None:
+        client, chapter_id = game
+
+        response = client.put(f"/chapters/{chapter_id}/draft", json={"body": "a" * 1_100_000})
+
+        assert response.status_code == 413
+        assert response.json()["detail"] == "RequestTooLarge"
+
+    def test_a_draft_under_the_cap_still_saves(self, game: tuple[TestClient, uuid.UUID]) -> None:
+        client, chapter_id = game
+
+        response = client.put(f"/chapters/{chapter_id}/draft", json={"body": "a" * 5_000})
+
+        assert response.status_code == 204
 
 
 def _rows(db_engine: Engine) -> list[TelemetryEvent]:
