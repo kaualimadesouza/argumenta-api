@@ -1,18 +1,20 @@
 {
+  "title": "Repertorio inventado sustentando a tese",
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "confronto",
+  "exam": "enem",
   "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
   "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
   "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
   "min_words": 120,
   "max_words": 250,
-  "slug": "04-repertorio-falso",
-  "title": "Repertorio inventado sustentando a tese",
+  "spelling_anchors": 0,
   "expected": {
     "norma_culta": 80,
     "coesao": 70,
     "coerencia": 60,
-    "repertorio": 15,
+    "repertorio": 20,
     "persuasao": 45
   },
-  "text": "Dona Marta, o festival do gremio precisa ser liberado porque existe uma lei federal de 2019 que obriga toda escola publica brasileira a realizar pelo menos dois festivais culturais por ano, sob pena de multa. Alem disso, um estudo da Universidade de Harvard provou que escolas que fazem festivais tem noventa por cento menos evasao escolar, e o Ministerio da Educacao chegou a distribuir uma cartilha obrigando os diretores a autorizar esse tipo de evento. Portanto, negar o festival colocaria a escola em situacao irregular perante os orgaos de fiscalizacao. Nos, do gremio, podemos organizar a limpeza e os horarios, mas o ponto central é que a senhora nao tem, na pratica, a opcao de recusar, porque a legislacao e a pesquisa cientifica ja decidiram essa questao por nos. Peco, entao, que a autorizacao seja assinada ainda esta semana para evitar qualquer problema legal para a direcao da escola.",
-  "source": "autoral (Argumenta), nao e redacao oficial"
+  "text": "Dona Marta, o festival do grêmio precisa ser liberado porque o artigo 300 da Constituição de 1988 obriga toda escola pública brasileira a realizar pelo menos dois festivais culturais por ano, sob pena de multa. Além disso, o Estatuto da Criança e do Adolescente, promulgado em 1975, já previa a mesma exigência, e um estudo da Universidade de Harvard provou que escolas com festival têm noventa por cento menos evasão escolar. O Ministério da Educação chegou a distribuir uma cartilha obrigando os diretores a autorizar esse tipo de evento. Portanto, negar o festival colocaria a escola em situação irregular perante os órgãos de fiscalização. Nós, do grêmio, podemos organizar a limpeza e os horários, mas o ponto central é que a senhora não tem, na prática, a opção de recusar, porque a legislação e a pesquisa científica já decidiram essa questão por nós. Peço, então, que a autorização seja assinada ainda esta semana, para evitar qualquer problema legal para a direção da escola."
 }

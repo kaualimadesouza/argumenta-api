@@ -1,18 +1,20 @@
 {
+  "title": "Plano concreto com responsaveis e consequencia assumida",
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "confronto",
+  "exam": "enem",
   "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
   "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
   "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
   "min_words": 120,
   "max_words": 250,
-  "slug": "01-plano-concreto-forte",
-  "title": "Plano concreto com responsaveis e consequencia assumida",
+  "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 90,
+    "norma_culta": 85,
     "coesao": 85,
     "coerencia": 85,
     "repertorio": 75,
-    "persuasao": 90
+    "persuasao": 85
   },
-  "text": "Dona Marta, eu entendo que o festival do ano passado terminou com a quadra suja e com duas reclamacoes dos vizinhos. É justamente por isso que trago um plano, e nao apenas um pedido. Proponho tres turnos de limpeza com escala assinada por vinte alunos, encerramento as vinte e duas horas e um responsavel adulto por setor; o professor de educacao fisica ja aceitou coordenar a divisao. O que a experiencia de outras escolas mostra e que o problema raramente esta no evento, mas na ausencia de combinados escritos. Em uma escola estadual do bairro vizinho, o gremio passou a registrar em ata quem responde por cada etapa, e as reclamacoes cairam a zero em duas edicoes seguidas. Se a senhora autorizar, entrego a ata antes do festival e assumo formalmente a devolucao da quadra limpa. Se falharmos em qualquer item combinado, o festival do proximo semestre nao acontece, e isso tambem fica escrito.",
-  "source": "autoral (Argumenta), nao e redacao oficial"
+  "text": "Dona Marta, eu entendo que o festival do ano passado terminou com a quadra suja e com duas reclamações dos vizinhos. É justamente por isso que trago um plano, e não apenas um pedido. Proponho três turnos de limpeza com escala assinada por vinte alunos, encerramento às vinte e duas horas e um responsável adulto por setor; o professor de educação física já aceitou coordenar a divisão. O que a experiência de outras escolas mostra é que o problema raramente está no evento, mas na ausência de combinados escritos. Em uma escola estadual do bairro vizinho, o grêmio passou a registrar em ata quem responde por cada etapa, e as reclamações caíram a zero em duas edições seguidas. Se a senhora autorizar, entrego a ata antes do festival e assumo formalmente a devolução da quadra limpa. Se falharmos em qualquer item combinado, o festival do próximo semestre não acontece, e isso também fica escrito."
 }

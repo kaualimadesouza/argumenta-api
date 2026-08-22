@@ -12,6 +12,7 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import (
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
+from argumenta.adapters.llm.responses import Effort, ensure_not_truncated
 from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
@@ -84,12 +85,22 @@ def _format_dimensions(required: tuple[Dimension, ...]) -> str:
 
 
 class ClaudeEvaluationEngine:
-    """Claude with forced tool use and temperature 0: structured, repeatable."""
+    """Claude with forced tool use: the tool schema is what makes the output
+    structured. Sonnet 5 rejects a non-default temperature and thinks
+    adaptively, so repeatability comes from the forced contract and the
+    versioned prompt, never from sampling parameters."""
 
-    def __init__(self, api_key: str, model: str, max_tokens: int = 3000) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        max_tokens: int = 8000,
+        effort: Effort = "medium",
+    ) -> None:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
         self._max_tokens = max_tokens
+        self._effort = effort
 
     def evaluate(self, request: EngineRequest) -> EngineResult:
         started = time.monotonic()
@@ -97,7 +108,7 @@ class ClaudeEvaluationEngine:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=self._max_tokens,
-                temperature=0.0,
+                output_config={"effort": self._effort},
                 system=SYSTEM_PROMPT,
                 tools=[_tool_definition()],
                 tool_choice=ToolChoiceToolParam(type="tool", name=_TOOL_NAME),
@@ -121,6 +132,7 @@ class ClaudeEvaluationEngine:
         except anthropic.AnthropicError as error:
             raise EvaluationFailedError(str(error)) from error
         latency_ms = int((time.monotonic() - started) * 1000)
+        ensure_not_truncated(response.stop_reason, self._max_tokens)
 
         payload = next(
             (block.input for block in response.content if block.type == "tool_use"), None

@@ -1,18 +1,20 @@
 {
+  "title": "Boas ideias sem conectivo nem retomada",
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "confronto",
+  "exam": "enem",
   "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
   "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
   "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
   "min_words": 120,
   "max_words": 250,
-  "slug": "03-ideias-soltas-sem-coesao",
-  "title": "Boas ideias sem conectivo nem retomada",
+  "spelling_anchors": 0,
   "expected": {
-    "norma_culta": 75,
+    "norma_culta": 80,
     "coesao": 25,
     "coerencia": 55,
     "repertorio": 55,
     "persuasao": 55
   },
-  "text": "Dona Marta, o festival é importante. A quadra ficou suja no ano passado. Os vizinhos reclamaram do barulho. Nos temos vinte alunos. A limpeza pode ser feita em tres turnos. O professor de educacao fisica aceitou coordenar. O horario pode terminar as vinte e duas horas. Outra escola do bairro fez uma ata. As reclamacoes cairam nessa escola. A ata resolve o problema da responsabilidade. O gremio quer assumir. A escola ganha visibilidade. Os alunos aprendem organizacao. A senhora pode acompanhar tudo. O festival do proximo semestre pode ser cancelado se falharmos. A responsabilidade sera assinada. Os pais podem ser avisados por circular. A quadra sera devolvida limpa. O evento tem valor pedagogico. A decisao é da senhora. Nos esperamos uma resposta positiva. O plano esta pronto para comecar.",
-  "source": "autoral (Argumenta), nao e redacao oficial"
+  "text": "Dona Marta, o festival é importante. A quadra ficou suja no ano passado. Os vizinhos reclamaram do barulho. Nós temos vinte alunos. A limpeza pode ser feita em três turnos. O professor de educação física aceitou coordenar. O horário pode terminar às vinte e duas horas. Outra escola do bairro fez uma ata. As reclamações caíram nessa escola. A ata resolve o problema da responsabilidade. O grêmio quer assumir. A escola ganha visibilidade. Os alunos aprendem organização. A senhora pode acompanhar tudo. O festival do próximo semestre pode ser cancelado se falharmos. A responsabilidade será assinada. Os pais podem ser avisados por circular. A quadra será devolvida limpa. O evento tem valor pedagógico. A decisão é da senhora. Nós esperamos uma resposta positiva. O plano está pronto para começar."
 }

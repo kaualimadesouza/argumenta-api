@@ -1,0 +1,20 @@
+{
+  "title": "Dissertacao chefe sob a lente FUVEST, sem proposta de intervencao",
+  "source": "autoral (Argumenta), nao e redacao oficial",
+  "chapter_kind": "chefe",
+  "exam": "fuvest",
+  "chapter_objective": "Sustentar, em dissertacao argumentativa, que a iniciativa estudantil deve integrar o projeto da escola em vez de depender de autorizacao caso a caso.",
+  "evaluator_brief": "Conta como argumento viavel: tese explicita, argumentos encadeados com repertorio pertinente e reconhecimento do contra-argumento. Nao conta: apelo emocional vazio, repertorio inventado, ameaca.",
+  "persona_brief": "A banca da FUVEST le uma dissertacao: cobra tese, encadeamento e leitura critica, e nao exige proposta de intervencao.",
+  "min_words": 250,
+  "max_words": 450,
+  "spelling_anchors": 0,
+  "expected": {
+    "norma_culta": 85,
+    "coesao": 82,
+    "coerencia": 85,
+    "repertorio": 70,
+    "persuasao": 80
+  },
+  "text": "A escola brasileira aprendeu a falar de protagonismo estudantil, mas ainda hesita quando o estudante age. O festival organizado pelo grêmio é o exemplo mais claro desse desconforto: todo semestre ele volta à mesa da direção como se fosse a primeira vez, e todo semestre a discussão recomeça do zero. Defendo que a iniciativa estudantil deve ser tratada como parte do projeto da escola, e não como um risco que a gestão tolera por bondade.\n\nO primeiro motivo é de formação. Organizar um evento obriga o estudante a lidar com prazo, dinheiro, conflito de interesses e prestação de contas, isto é, com a parte da vida adulta que nenhuma prova mede. Quem já assinou uma escala de limpeza e precisou cobrar o colega que faltou aprendeu sobre responsabilidade mais do que em qualquer aula sobre o tema. A escola que impede esse exercício não protege o aluno: apenas adia o encontro dele com as consequências das próprias decisões.\n\nO segundo motivo é institucional. Quando a autorização depende do humor de cada semestre, a escola ensina que o combinado vale menos do que a relação pessoal com quem decide. O efeito é o oposto do pretendido, porque o estudante conclui que negociar regras é perda de tempo e que o caminho curto é o improviso. Já onde existe um procedimento estável, com responsável registrado por etapa, o conflito sai do terreno da confiança e entra no terreno da verificação, que é onde uma instituição consegue de fato responder por aquilo que autoriza.\n\nHá, é verdade, um custo de supervisão, e ele não é pequeno para uma direção que responde sozinha por barulho, limpeza e segurança. Reconhecer esse custo, porém, não enfraquece o argumento: fortalece a exigência de que a iniciativa estudantil venha acompanhada de compromissos escritos. Entre uma escola que proíbe para não administrar e uma escola que administra para poder autorizar, apenas a segunda cumpre aquilo que diz nos seus documentos."
+}

@@ -1,11 +1,18 @@
 name: Calibration
 
-# Manual or nightly, never on pull requests: this job spends LLM tokens and
-# measures engine drift, so it must not gate ordinary changes (issue #12).
+# Never on pull requests: this job spends LLM tokens. It runs when a prompt
+# changes (the only thing that moves the scores on purpose), on demand, and
+# weekly as a floor so a silent model change still shows up (issue #12).
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/argumenta/adapters/llm/prompts/**"
+      - "tests/calibration/**"
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 6 * * 1"
 
 concurrency:
   group: calibration
@@ -21,22 +28,30 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+          python-version: '3.12'
 
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: |
+          pip install uv
+          uv venv --python=python3.12
+          uv sync
 
-      - name: Run the calibration suite
+      # a manual run means someone wanted the measurement: no key, no measurement
+      - name: Require the API key on a manual run
+        if: github.event_name == 'workflow_dispatch'
         env:
           ARGUMENTA_ANTHROPIC_API_KEY: ${{ secrets.ARGUMENTA_ANTHROPIC_API_KEY }}
         run: |
           if [ -z "$ARGUMENTA_ANTHROPIC_API_KEY" ]; then
-            echo "### Calibracao nao executada" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "O secret ARGUMENTA_ANTHROPIC_API_KEY nao esta configurado no repositorio." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "secret ARGUMENTA_ANTHROPIC_API_KEY is not configured" >&2
+            exit 1
           fi
-          uv run pytest -m calibration -p no:randomly -q
+
+      # -m overrides the addopts in pyproject, which deselects this suite by
+      # default; -s keeps the report visible when the run passes
+      - name: Run the calibration suite
+        env:
+          ARGUMENTA_ANTHROPIC_API_KEY: ${{ secrets.ARGUMENTA_ANTHROPIC_API_KEY }}
+        run: |
+          source .venv/bin/activate
+          uv run --active pytest -m calibration -s
