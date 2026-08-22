@@ -23,6 +23,11 @@ make check              # lint + typecheck + contratos de import + testes
 
 Variáveis de ambiente: copie `.env.example` para `.env` (prefixo `ARGUMENTA_`).
 
+`make seed` insere o conteúdo das histórias (tutorial "O Gremio" e a história
+ENEM "Cuidado Invisível"). É idempotente por slug, então roda em todo deploy:
+história já presente é reportada e não é tocada. A trilha é linear na ordem de
+`stories.position`, então a história ENEM abre quando o tutorial termina.
+
 ## Arquitetura
 
 Hexagonal (ports and adapters) com CQRS na camada de aplicação, seguindo a
