@@ -1,11 +1,16 @@
-"""Issue #10: AI character reaction to the student's text, tests first (TDD)."""
+"""Issue #10: AI character reaction to the student's text, tests first (TDD).
+Issue #33 adds the race, the authored fallback rule and the repository
+get-or-create, which the first round left to the database alone."""
 
+import logging
 import uuid
+from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,10 +21,17 @@ from argumenta.adapters.db.models import (
     Evaluation,
 )
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
+from argumenta.adapters.db.repositories.reactions import SqlAlchemyReactionRepository
 from argumenta.application.reactions.ports import ReactionRequest, ReactionText
-from argumenta.domain.enums import ReactionBeat, Verdict
+from argumenta.domain.enums import BeatType, ReactionBeat, Verdict
 from argumenta.domain.errors import EvaluationFailedError, LlmBudgetExceededError
-from argumenta.domain.reactions import reaction_beat_for
+from argumenta.domain.reactions import (
+    CONVINCED_FALLBACK,
+    REBUTTAL_FALLBACK,
+    reaction_beat_for,
+    scripted_reaction,
+)
+from argumenta.domain.track import BeatContent
 from argumenta.presentation.fastapi.dependencies import (
     get_llm_budget,
     get_reaction_engine,
@@ -43,15 +55,53 @@ class TestReactionBeatRule:
         assert reaction_beat_for(Verdict.FAILED_TECHNICAL) is None
 
 
+class TestScriptedReactionRule:
+    """The line the character plays when the AI cannot speak for them."""
+
+    @staticmethod
+    def _beat(beat_type: BeatType, body: str) -> BeatContent:
+        return BeatContent(
+            beat_type=beat_type,
+            body=body,
+            character_name="Dona Marta",
+            character_portrait=None,
+            illustration_asset=None,
+        )
+
+    def test_a_convinced_beat_has_no_authored_equivalent(self) -> None:
+        authored = [self._beat(BeatType.DIALOGUE, "fala escrita a mao")]
+
+        assert scripted_reaction(ReactionBeat.CONVINCED, authored) == CONVINCED_FALLBACK
+
+    def test_a_rebuttal_plays_the_first_authored_dialogue(self) -> None:
+        authored = [
+            self._beat(BeatType.NARRATION, "a diretora fecha a pasta"),
+            self._beat(BeatType.DIALOGUE, "primeira fala"),
+            self._beat(BeatType.DIALOGUE, "segunda fala"),
+        ]
+
+        assert scripted_reaction(ReactionBeat.REBUTTAL, authored) == "primeira fala"
+
+    def test_a_rebuttal_without_authored_dialogue_still_answers(self) -> None:
+        authored = [self._beat(BeatType.NARRATION, "so narracao aqui")]
+
+        assert scripted_reaction(ReactionBeat.REBUTTAL, authored) == REBUTTAL_FALLBACK
+
+
 class FakeReactionEngine:
     def __init__(self) -> None:
         self.calls: list[ReactionRequest] = []
         self.fail_with: Exception | None = None
+        self.before_return: Callable[[], None] | None = None
+        """Runs while the call is in flight: how a test plays the other side
+        of a race without threads."""
 
     def generate(self, request: ReactionRequest) -> ReactionText:
         self.calls.append(request)
         if self.fail_with is not None:
             raise self.fail_with
+        if self.before_return is not None:
+            self.before_return()
         return ReactionText(
             body=f'{request.character_name} responde citando "palavra".',
             model="claude-sonnet-5",
@@ -94,6 +144,7 @@ class TestReactionEndpoint:
         body = response.json()
         assert body["beat"] == "convinced"
         assert body["character_name"] == "Dona Marta"
+        assert body["provisional"] is False, "a real reaction is not a placeholder"
         # what the engine wrote reaches the client verbatim; that the reaction
         # really quotes the student is pinned by the request assertions below
         name = reaction_engine.calls[0].character_name
@@ -167,10 +218,57 @@ class TestReactionEndpoint:
         body = response.json()
         # first dialogue beat of the consequence branch of chapter 1
         assert body["body"].startswith("Bonito, mas e o mesmo discurso")
+        assert body["provisional"] is True, (
+            "the client has to be able to tell a scripted line from a real one"
+        )
         with Session(db_engine) as session:
             assert session.scalars(select(CharacterReaction)).all() == [], (
                 "a scripted fallback costs no tokens and must not freeze the reaction"
             )
+
+    def test_a_retired_line_is_generated_again(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+        reaction_engine: FakeReactionEngine,
+        db_engine: Engine,
+    ) -> None:
+        """What the fallback retirement migration relies on: the lookup reads
+        live rows only, so soft deleting one makes the beat regenerable."""
+        client, chapter_id = game
+        submission_id = _submission_id(client, chapter_id, engine_double, "approved")
+        assert client.post(f"/submissions/{submission_id}/reaction").status_code == 200
+        with Session(db_engine) as session:
+            session.execute(update(CharacterReaction).values(deleted_at=datetime.now(tz=UTC)))
+            session.commit()
+
+        client.post(f"/submissions/{submission_id}/reaction")
+
+        assert len(reaction_engine.calls) == 2
+        with Session(db_engine) as session:
+            live = session.scalars(
+                select(CharacterReaction).where(CharacterReaction.deleted_at.is_(None))
+            ).one()
+            assert live.model == "claude-sonnet-5"
+
+    def test_the_fallback_is_logged_with_enough_to_find_the_student(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+        reaction_engine: FakeReactionEngine,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        client, chapter_id = game
+        reaction_engine.fail_with = EvaluationFailedError("api down")
+        submission_id = _submission_id(client, chapter_id, engine_double, "failed_persuasion")
+
+        with caplog.at_level(logging.WARNING):
+            client.post(f"/submissions/{submission_id}/reaction")
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert submission_id in logged
+        assert "beat=rebuttal" in logged
+        assert "EvaluationFailedError" in logged
 
     def test_fallback_is_retried_once_the_engine_recovers(
         self,
@@ -209,6 +307,7 @@ class TestReactionEndpoint:
         assert response.status_code == 200
         assert reaction_engine.calls == []
         assert response.json()["body"].startswith("Bonito, mas e o mesmo discurso")
+        assert response.json()["provisional"] is True
         with Session(db_engine) as session:
             assert session.scalars(select(CharacterReaction)).all() == []
 
@@ -384,3 +483,91 @@ class TestReactionEndpoint:
         )
 
         assert client.post(f"/submissions/{submission_id}/reaction").status_code == 404
+
+
+class TestReactionRace:
+    """Two POSTs for the same beat at the same time: the partial unique decides
+    which line is stored, and both clients have to read that one."""
+
+    def test_the_loser_of_the_race_reads_the_line_that_was_stored(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+        reaction_engine: FakeReactionEngine,
+        db_engine: Engine,
+    ) -> None:
+        client, chapter_id = game
+        submission_id = _submission_id(client, chapter_id, engine_double, "approved")
+        reaction_engine.before_return = lambda: _store_competing_reaction(
+            db_engine, uuid.UUID(submission_id), "fala do vencedor"
+        )
+
+        body = client.post(f"/submissions/{submission_id}/reaction").json()
+
+        assert body["body"] == "fala do vencedor", (
+            "returning its own unpersisted text would show the student a line "
+            "that a refresh then rewrites"
+        )
+        with Session(db_engine) as session:
+            stored = session.scalars(select(CharacterReaction)).one()
+        assert stored.body == "fala do vencedor"
+
+
+class TestReactionRepository:
+    def test_store_or_get_keeps_the_first_line_and_returns_it(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+        reaction_engine: FakeReactionEngine,
+        db_engine: Engine,
+    ) -> None:
+        """The ON CONFLICT branch, which no test reached before: a wrong
+        index_where would raise 42P10 here and only in a real race."""
+        client, chapter_id = game
+        submission_id = _submission_id(client, chapter_id, engine_double, "approved")
+        assert client.post(f"/submissions/{submission_id}/reaction").status_code == 200
+
+        with Session(db_engine) as session:
+            stored = session.scalars(select(CharacterReaction)).one()
+            first_body = stored.body
+            first_tokens = (stored.input_tokens or 0, stored.output_tokens or 0)
+            body = SqlAlchemyReactionRepository(session).store_or_get(
+                stored.submission_id,
+                stored.character_id,
+                stored.beat,
+                ReactionText(
+                    body="segunda fala do mesmo beat",
+                    model="claude-sonnet-5",
+                    prompt_version="react-v1.0",
+                    input_tokens=1,
+                    output_tokens=1,
+                ),
+            )
+            session.commit()
+
+        assert body == first_body
+        with Session(db_engine) as session:
+            row = session.scalars(select(CharacterReaction)).one()
+        assert row.body == first_body
+        assert (row.input_tokens, row.output_tokens) == (
+            first_tokens[0] + 1,
+            first_tokens[1] + 1,
+        ), "the loser paid the API too, and the monthly cap reads these columns"
+
+
+def _store_competing_reaction(db_engine: Engine, submission_id: uuid.UUID, body: str) -> None:
+    with Session(db_engine) as session:
+        character_id = session.scalar(select(Character.id).where(Character.name == "Dona Marta"))
+        session.add(
+            CharacterReaction(
+                submission_id=submission_id,
+                character_id=character_id,
+                beat=ReactionBeat.CONVINCED,
+                body=body,
+                model="claude-sonnet-5",
+                prompt_version="react-v1.0",
+                input_tokens=900,
+                output_tokens=42,
+            )
+        )
+        session.commit()

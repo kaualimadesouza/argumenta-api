@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -11,11 +11,7 @@ from argumenta.adapters.db.models import (
     Evaluation,
     Submission,
 )
-from argumenta.application.reactions.ports import (
-    ReactionContext,
-    ReactionText,
-    StoredReaction,
-)
+from argumenta.application.reactions.ports import ReactionContext, ReactionText
 from argumenta.domain.enums import ReactionBeat
 
 
@@ -53,51 +49,47 @@ class SqlAlchemyReactionRepository:
             chapter_objective=objective,
         )
 
-    def find(
-        self, user_id: uuid.UUID, submission_id: uuid.UUID, beat: ReactionBeat
-    ) -> StoredReaction | None:
-        row = self._session.execute(
-            select(CharacterReaction.beat, CharacterReaction.body, Character.name)
-            .join(Character, Character.id == CharacterReaction.character_id)
-            .join(Submission, Submission.id == CharacterReaction.submission_id)
-            .where(
+    def find_body(self, submission_id: uuid.UUID, beat: ReactionBeat) -> str | None:
+        return self._session.scalar(
+            select(CharacterReaction.body).where(
                 CharacterReaction.submission_id == submission_id,
                 CharacterReaction.beat == beat,
                 CharacterReaction.deleted_at.is_(None),
-                Submission.user_id == user_id,
-                Submission.deleted_at.is_(None),
             )
-        ).one_or_none()
-        if row is None:
-            return None
-        stored_beat, body, character_name = row
-        return StoredReaction(beat=stored_beat, character_name=character_name, body=body)
+        )
 
-    def store(
+    def store_or_get(
         self,
         submission_id: uuid.UUID,
         character_id: uuid.UUID,
         beat: ReactionBeat,
         reaction: ReactionText,
-    ) -> None:
-        """Concurrent requests race here, and the partial unique on
-        (submission_id, beat) is what decides: the loser keeps its generated
-        text and the reader sees the winner's line."""
-        self._session.execute(
-            insert(CharacterReaction)
-            .values(
-                submission_id=submission_id,
-                character_id=character_id,
-                beat=beat,
-                body=reaction.body,
-                model=reaction.model,
-                prompt_version=reaction.prompt_version,
-                input_tokens=reaction.input_tokens,
-                output_tokens=reaction.output_tokens,
-            )
-            .on_conflict_do_nothing(
+    ) -> str:
+        """One statement, so the caller cannot return a line that is not in the
+        database. The partial unique arbitrates the race: the stored line wins
+        the body, and the loser adds the tokens it was billed anyway."""
+        statement = insert(CharacterReaction).values(
+            submission_id=submission_id,
+            character_id=character_id,
+            beat=beat,
+            body=reaction.body,
+            model=reaction.model,
+            prompt_version=reaction.prompt_version,
+            input_tokens=reaction.input_tokens,
+            output_tokens=reaction.output_tokens,
+        )
+        return self._session.execute(
+            statement.on_conflict_do_update(
                 index_elements=["submission_id", "beat"],
                 index_where=text("deleted_at IS NULL"),
-            )
-        )
-        self._session.flush()
+                # tokens per beat, not per generation: the loser of the race also
+                # paid the API, and the monthly cap reads exactly these columns
+                set_={
+                    "input_tokens": func.coalesce(CharacterReaction.input_tokens, 0)
+                    + func.coalesce(statement.excluded.input_tokens, 0),
+                    "output_tokens": func.coalesce(CharacterReaction.output_tokens, 0)
+                    + func.coalesce(statement.excluded.output_tokens, 0),
+                    "updated_at": func.now(),
+                },
+            ).returning(CharacterReaction.body)
+        ).scalar_one()

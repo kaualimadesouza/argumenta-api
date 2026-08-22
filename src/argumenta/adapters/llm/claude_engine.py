@@ -13,6 +13,8 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import (
     SYSTEM_PROMPT,
     USER_TEMPLATE,
 )
+from argumenta.adapters.llm.prompts.student_text import defuse_fence
+from argumenta.adapters.llm.usage import billed_input_tokens
 from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
@@ -85,15 +87,9 @@ def _format_dimensions(required: tuple[Dimension, ...]) -> str:
 
 
 class ClaudeEvaluationEngine:
-    """Claude with forced tool use: the tool schema is what makes the output
-    structured. Sonnet 5 rejects a non-default temperature and thinks
-    adaptively, so repeatability comes from the forced contract and the
-    versioned prompt, never from sampling parameters.
-
-    `effort` defaults to the API default, so this adapter does not quietly
-    change how hard the grader thinks. Lowering it is a decision to take with
-    the calibration suite in hand, not in passing.
-    """
+    """Forced tool use is what makes the output structured. Sonnet 5 rejects a
+    non-default temperature, so repeatability comes from that contract and the
+    versioned prompt; effort stays at the API default (calibration suite owns it)."""
 
     def __init__(
         self,
@@ -101,8 +97,14 @@ class ClaudeEvaluationEngine:
         model: str,
         max_tokens: int = 8000,
         effort: Effort = "high",
+        timeout: float = 90.0,
+        max_retries: int = 1,
     ) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
+        # one retry, because a timed out call is billed server side and the
+        # retry is billed again without either being recorded
+        self._client = anthropic.Anthropic(
+            api_key=api_key, timeout=timeout, max_retries=max_retries
+        )
         self._model = model
         self._max_tokens = max_tokens
         self._effort = effort
@@ -129,7 +131,7 @@ class ClaudeEvaluationEngine:
                             anchors=_format_anchors(request),
                             dimensions=_format_dimensions(request.required_dimensions),
                             format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
-                            text=request.text,
+                            text=defuse_fence(request.text),
                         ),
                     }
                 ],
@@ -166,6 +168,6 @@ class ClaudeEvaluationEngine:
             model=self._model,
             prompt_version=PROMPT_VERSION,
             latency_ms=latency_ms,
-            input_tokens=response.usage.input_tokens,
+            input_tokens=billed_input_tokens(response.usage),
             output_tokens=response.usage.output_tokens,
         )

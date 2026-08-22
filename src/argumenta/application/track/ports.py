@@ -11,7 +11,10 @@ class ContentRepository(Protocol):
 
     def get_chapter(self, chapter_id: uuid.UUID) -> ChapterContent | None: ...
 
-    def list_beats(self, chapter_id: uuid.UUID, branch: Branch) -> list[BeatContent]: ...
+    def list_beats(self, chapter_id: uuid.UUID, branch: Branch) -> list[BeatContent]:
+        """In position order: the reaction fallback plays the first authored
+        dialogue of the branch, so the order is part of the contract."""
+        ...
 
 
 class ProgressRepository(Protocol):

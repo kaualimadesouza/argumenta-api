@@ -36,13 +36,6 @@ class ReactionContext:
     chapter_objective: str
 
 
-@dataclass(frozen=True)
-class StoredReaction:
-    beat: ReactionBeat
-    character_name: str
-    body: str
-
-
 class ReactionEngine(Protocol):
     def generate(self, request: ReactionRequest) -> ReactionText: ...
 
@@ -52,18 +45,19 @@ class ReactionRepository(Protocol):
         self, user_id: uuid.UUID, submission_id: uuid.UUID
     ) -> ReactionContext | None: ...
 
-    def find(
-        self, user_id: uuid.UUID, submission_id: uuid.UUID, beat: ReactionBeat
-    ) -> StoredReaction | None:
+    def find_body(self, submission_id: uuid.UUID, beat: ReactionBeat) -> str | None:
         """Per beat, not per submission: consequence_intro and recovery_prompt
-        share this table (DER). The user filter keeps ownership in the query
-        instead of in the order the use case happens to call things."""
+        share this table (DER). Only reachable after get_context matched the
+        submission to the user, which is where ownership is enforced."""
         ...
 
-    def store(
+    def store_or_get(
         self,
         submission_id: uuid.UUID,
         character_id: uuid.UUID,
         beat: ReactionBeat,
         reaction: ReactionText,
-    ) -> None: ...
+    ) -> str:
+        """Returns the line that is actually stored, which is not always the
+        one just generated: concurrent calls race and the database decides."""
+        ...

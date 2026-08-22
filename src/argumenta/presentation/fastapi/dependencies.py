@@ -154,12 +154,16 @@ def get_draft_repository(session: DbSession) -> SqlAlchemyDraftRepository:
     return SqlAlchemyDraftRepository(session)
 
 
+@lru_cache
 def get_evaluation_engine() -> EvaluationEngine:
+    """One HTTP client for the process: an Anthropic client per request means a
+    connection pool per request."""
     settings = get_settings()
     return ClaudeEvaluationEngine(
         api_key=settings.anthropic_api_key,
         model=settings.evaluation_model,
         effort=settings.evaluation_effort,
+        timeout=settings.evaluation_timeout_seconds,
     )
 
 
@@ -189,18 +193,14 @@ def get_reaction_repository(session: DbSession) -> SqlAlchemyReactionRepository:
 
 
 @lru_cache
-def _reaction_engine_singleton() -> ClaudeReactionEngine:
-    """One HTTP client for the process, like the other singletons here."""
+def get_reaction_engine() -> ReactionEngine:
     settings = get_settings()
     return ClaudeReactionEngine(
         api_key=settings.anthropic_api_key,
         model=settings.reaction_model,
         effort=settings.reaction_effort,
+        timeout=settings.reaction_timeout_seconds,
     )
-
-
-def get_reaction_engine() -> ReactionEngine:
-    return _reaction_engine_singleton()
 
 
 def get_character_reaction_use_case(
