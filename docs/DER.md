@@ -1,8 +1,16 @@
 # DER: Argumenta
 
-Versão 0.7, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.8, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.8 (issue 13): `telemetry_events.occurred_at`, a hora do evento no
+cliente. `created_at` é a hora do flush do buffer, e ritmo de digitação é série
+temporal: sem a hora do cliente, cinquenta eventos de um lote compartilham um
+único timestamp e os intervalos somem. Nullable, então as linhas anteriores
+seguem significando "hora do cliente desconhecida". O payload passou a ter forma
+tipada por `event_type` (contadores e um slug de tela), o que mantém texto do
+aluno fora do único jsonb do modelo.
 
 Mudanças da v0.7 (implementação das issues 10, 11 e 33):
 `character_reactions.input_tokens` e o único parcial
@@ -397,7 +405,8 @@ erDiagram
     uuid user_id FK
     uuid submission_id FK "opcional"
     text event_type "paste, typing_stats, screen_view"
-    jsonb payload "unico jsonb do modelo"
+    timestamptz occurred_at "hora no cliente, opcional"
+    jsonb payload "unico jsonb do modelo, forma tipada por event_type"
     timestamptz created_at
     timestamptz updated_at
     timestamptz deleted_at
@@ -413,9 +422,16 @@ Notas:
   incrementa `submissions_count` e rejeita acima do teto.
 - Streak atual e recorde derivam de `daily_activity` (dias consecutivos com
   `submissions_count > 0`); nada denormalizado no MVP.
-- Telemetria anti-cola sem bloqueio (decisão do PRD): eventos `paste` e
-  `typing_stats` com payload livre em JSONB, o único JSONB do modelo, porque o
-  formato é heterogêneo por natureza.
+- Telemetria anti-cola sem bloqueio (decisão do PRD): `paste`, `typing_stats` e
+  `screen_view` no único JSONB do modelo. O payload é heterogêneo entre tipos de
+  evento, mas **não é livre**: cada `event_type` tem uma forma fechada de
+  contadores (e um slug de tela), validada na borda, o que mantém texto do aluno
+  fora do JSONB.
+- `submissions.typing_ms` e `submissions.paste_count` são o resumo que o cliente
+  anexa ao texto entregue, e é o que a correção enxerga; `telemetry_events` é o
+  fluxo bruto para análise. Os dois podem divergir (o resumo é um número que o
+  cliente calculou, o fluxo é o que ele conseguiu enviar) e, quando divergirem,
+  o resumo é o que vale para o produto.
 
 ## Enums
 
@@ -452,7 +468,10 @@ linha logicamente apagada sem colisão.
   parcial, uma reação por beat da submissão.
 - `evaluation_scores (evaluation_id)` e, para o gráfico de evolução,
   `evaluation_scores (dimension)` combinado com join em `evaluations.created_at`.
-- `telemetry_events (user_id, created_at)`: consultas por aluno e período.
+- `telemetry_events (user_id, created_at)`: consultas por aluno e período, pela
+  hora de chegada. Ritmo se lê por intervalos dentro de um lote, que cabe numa
+  só linha de resultado dessa varredura, então `occurred_at` fica sem índice até
+  existir consulta que ordene por ele (é a tabela de maior volume do modelo).
 - `chapter_beats (chapter_id, branch, position)`: leitura do roteiro em ordem.
 
 ## Decisões de modelagem

@@ -1,8 +1,18 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Identity, Index, SmallInteger, Text, text
+from sqlalchemy import (
+    BigInteger,
+    Date,
+    DateTime,
+    ForeignKey,
+    Identity,
+    Index,
+    SmallInteger,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,6 +56,11 @@ class TelemetryEvent(AuditMixin, Base):
     )
     event_type: Mapped[str] = mapped_column(
         Text, nullable=False, comment="paste, typing_stats, screen_view"
+    )
+    occurred_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="hora no cliente; created_at e a hora do flush",
     )
     payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, comment="unico jsonb do modelo"

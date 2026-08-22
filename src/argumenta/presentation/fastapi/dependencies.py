@@ -19,6 +19,7 @@ from argumenta.adapters.db.repositories.gameplay import (
 )
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
 from argumenta.adapters.db.repositories.reactions import SqlAlchemyReactionRepository
+from argumenta.adapters.db.repositories.telemetry import SqlAlchemyTelemetryRepository
 from argumenta.adapters.db.repositories.track import (
     SqlAlchemyActivityRepository,
     SqlAlchemyContentRepository,
@@ -32,12 +33,14 @@ from argumenta.adapters.security.argon2_hasher import Argon2PasswordHasher
 from argumenta.adapters.security.jwt_tokens import JwtTokenService
 from argumenta.adapters.security.rate_limiter import SlidingWindowRateLimiter
 from argumenta.adapters.spelling.spylls_checker import SpyllsSpellChecker
-from argumenta.application.accounts.ports import GoogleIdentityGateway, RateLimiter
+from argumenta.application.accounts.ports import GoogleIdentityGateway
 from argumenta.application.evaluation.ports import EvaluationEngine
 from argumenta.application.evaluation.use_cases import EvaluateArgumentUseCase
 from argumenta.application.gameplay.use_cases import SubmitArgumentUseCase
+from argumenta.application.ports import RateLimiter
 from argumenta.application.reactions.ports import ReactionEngine
 from argumenta.application.reactions.use_cases import GetCharacterReactionUseCase
+from argumenta.application.telemetry.use_cases import RecordTelemetryEventsUseCase
 from argumenta.settings import Settings, get_settings
 
 
@@ -85,16 +88,18 @@ def get_token_service() -> JwtTokenService:
 
 
 @lru_cache
-def _rate_limiter_singleton() -> SlidingWindowRateLimiter:
-    settings = get_settings()
-    return SlidingWindowRateLimiter(
-        max_attempts=settings.login_rate_limit_attempts,
-        window_seconds=settings.login_rate_limit_window_seconds,
-    )
+def _limiter(name: str, max_attempts: int, window_seconds: int) -> SlidingWindowRateLimiter:
+    """One sliding window per process and per name: in memory is enough for a
+    single container beta, and with N workers the effective limit is N times
+    this one (the limiter says so itself)."""
+    return SlidingWindowRateLimiter(max_attempts=max_attempts, window_seconds=window_seconds)
 
 
 def get_rate_limiter() -> RateLimiter:
-    return _rate_limiter_singleton()
+    settings = get_settings()
+    return _limiter(
+        "login", settings.login_rate_limit_attempts, settings.login_rate_limit_window_seconds
+    )
 
 
 def get_google_gateway() -> GoogleIdentityGateway:
@@ -224,3 +229,23 @@ def get_submit_argument_use_case(
     exams: Annotated[SqlAlchemyExamTargetRepository, Depends(get_exam_target_repository)],
 ) -> SubmitArgumentUseCase:
     return SubmitArgumentUseCase(contexts, submissions, progress, activity, drafts, evaluate, exams)
+
+
+def get_telemetry_repository(session: DbSession) -> SqlAlchemyTelemetryRepository:
+    return SqlAlchemyTelemetryRepository(session)
+
+
+def get_telemetry_rate_limiter() -> RateLimiter:
+    settings = get_settings()
+    return _limiter(
+        "telemetry",
+        settings.telemetry_rate_limit_batches,
+        settings.telemetry_rate_limit_window_seconds,
+    )
+
+
+def get_record_telemetry_use_case(
+    events: Annotated[SqlAlchemyTelemetryRepository, Depends(get_telemetry_repository)],
+    limiter: Annotated[RateLimiter, Depends(get_telemetry_rate_limiter)],
+) -> RecordTelemetryEventsUseCase:
+    return RecordTelemetryEventsUseCase(events, limiter)

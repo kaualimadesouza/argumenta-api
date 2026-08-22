@@ -91,3 +91,12 @@ class ChapterStatus(enum.StrEnum):
     IN_CONSEQUENCE = "in_consequence"
     IN_RECOVERY = "in_recovery"
     PASSED = "passed"
+
+
+class TelemetryEventType(enum.StrEnum):
+    """Stored as text (DER), validated here: an unknown type is a client bug,
+    not a new column. Each value has a payload type in domain.telemetry."""
+
+    PASTE = "paste"
+    TYPING_STATS = "typing_stats"
+    SCREEN_VIEW = "screen_view"

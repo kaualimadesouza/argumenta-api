@@ -51,11 +51,3 @@ class PasswordHasher(Protocol):
 
 class GoogleIdentityGateway(Protocol):
     def exchange_code(self, code: str, redirect_uri: str) -> GoogleIdentity: ...
-
-
-class RateLimiter(Protocol):
-    def check(self, key: str) -> bool:
-        """Register one attempt for the key; False when over the limit."""
-        ...
-
-    def reset(self, key: str) -> None: ...
