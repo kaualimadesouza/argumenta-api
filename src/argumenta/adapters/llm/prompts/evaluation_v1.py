@@ -1,4 +1,4 @@
-"""Evaluation prompt, version eval-v1.0.
+"""Evaluation prompt, version eval-v1.1.
 
 Versioned in the repository (PRD reliability rule); every change here MUST bump
 PROMPT_VERSION so evaluations stay comparable and the calibration suite (issue

@@ -16,20 +16,15 @@ from argumenta.application.evaluation.use_cases import (
 from argumenta.domain.enums import AnnotationType, Dimension, Severity, Verdict
 from argumenta.domain.errors import EvaluationFailedError, LlmBudgetExceededError
 from argumenta.domain.evaluation import (
+    BASE_DIMENSIONS,
     DimensionScore,
     EvaluationRuler,
     SpellingAnchor,
     decide_verdict,
 )
+from argumenta.domain.lenses import GradingSpec
 
 RULER = EvaluationRuler(dimension_floor=40, min_average=50)
-BASE_DIMENSIONS = (
-    Dimension.NORMA_CULTA,
-    Dimension.COESAO,
-    Dimension.COERENCIA,
-    Dimension.REPERTORIO,
-    Dimension.PERSUASAO,
-)
 
 
 def _scores(**by_dimension: int) -> tuple[DimensionScore, ...]:
@@ -99,38 +94,24 @@ class TestEngineOutputContract:
     }
 
     def test_valid_payload_parses(self) -> None:
-        output = parse_engine_output(self.PAYLOAD, "algo escrito pelo aluno", BASE_DIMENSIONS)
+        output = parse_engine_output(self.PAYLOAD, "algo escrito pelo aluno")
         assert len(output.scores) == 5
         assert output.annotations[0].type == AnnotationType.SPELLING
         assert output.annotations[0].severity == Severity.ERROR
 
-    def test_missing_dimension_is_rejected(self) -> None:
-        payload = {**self.PAYLOAD, "scores": self.PAYLOAD["scores"][:4]}
-        with pytest.raises(EvaluationFailedError):
-            parse_engine_output(payload, "texto", BASE_DIMENSIONS)
-
-    def test_the_five_base_dimensions_do_not_satisfy_a_boss_request(self) -> None:
-        """The boss essay under the ENEM lens asks for one dimension more."""
-        with pytest.raises(EvaluationFailedError):
-            parse_engine_output(
-                self.PAYLOAD,
-                "algo escrito pelo aluno",
-                (*BASE_DIMENSIONS, Dimension.PROPOSTA_INTERVENCAO),
-            )
-
     def test_score_out_of_range_is_rejected(self) -> None:
         bad = [{**s, "score": 150} for s in self.PAYLOAD["scores"]]
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto", BASE_DIMENSIONS)
+            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto")
 
     def test_span_outside_text_is_rejected(self) -> None:
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output(self.PAYLOAD, "abc", BASE_DIMENSIONS)
+            parse_engine_output(self.PAYLOAD, "abc")
 
     def test_empty_evidence_is_rejected(self) -> None:
         bad = [{**s, "evidence": ""} for s in self.PAYLOAD["scores"]]
         with pytest.raises(EvaluationFailedError):
-            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto", BASE_DIMENSIONS)
+            parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto")
 
 
 class FakeEngine:
@@ -176,8 +157,7 @@ def _request(
         min_words=120,
         max_words=250,
         ruler=RULER,
-        required_dimensions=required,
-        full_essay=full_essay,
+        spec=GradingSpec(dimensions=required, full_essay=full_essay),
     )
 
 

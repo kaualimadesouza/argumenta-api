@@ -2,12 +2,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from argumenta.application.accounts.ports import ExamTargetRepository
 from argumenta.application.evaluation.use_cases import (
     EvaluateArgument,
     EvaluateArgumentUseCase,
 )
 from argumenta.application.gameplay.ports import (
+    ActiveExamReader,
     DailyActivityWriter,
     DraftRepository,
     EvaluationContextRepository,
@@ -15,14 +15,14 @@ from argumenta.application.gameplay.ports import (
     ProgressWriter,
     SubmissionRepository,
 )
-from argumenta.domain.enums import ChapterKind, ChapterStatus, Verdict
+from argumenta.domain.enums import ChapterStatus, Verdict
 from argumenta.domain.errors import ChapterNotFoundError, WordCountOutOfRangeError
 from argumenta.domain.evaluation import EvaluationOutcome, EvaluationRuler
 from argumenta.domain.lenses import (
     DEFAULT_EXAM,
     LensView,
+    grading_spec,
     project_lens,
-    required_dimensions,
 )
 from argumenta.domain.submission import (
     DAILY_SUBMISSION_LIMIT,
@@ -66,7 +66,7 @@ class SubmitArgumentUseCase:
         activity: DailyActivityWriter,
         drafts: DraftRepository,
         evaluate: EvaluateArgumentUseCase,
-        targets: ExamTargetRepository,
+        exams: ActiveExamReader,
     ) -> None:
         self._contexts = contexts
         self._submissions = submissions
@@ -74,7 +74,7 @@ class SubmitArgumentUseCase:
         self._activity = activity
         self._drafts = drafts
         self._evaluate = evaluate
-        self._targets = targets
+        self._exams = exams
 
     def execute(self, request: SubmitArgument) -> SubmissionResult:
         context = self._contexts.get_context(request.chapter_id)
@@ -96,7 +96,7 @@ class SubmitArgumentUseCase:
         # transaction if anything after it fails
         self._activity.register_submission(request.user_id, now.date(), DAILY_SUBMISSION_LIMIT)
 
-        exam = self._targets.active_exam(request.user_id) or DEFAULT_EXAM
+        exam = self._exams.active_exam(request.user_id) or DEFAULT_EXAM
         outcome = self._evaluate.execute(
             EvaluateArgument(
                 text=request.body,
@@ -106,11 +106,11 @@ class SubmitArgumentUseCase:
                 min_words=chapter.min_words,
                 max_words=chapter.max_words,
                 ruler=context.ruler,
-                required_dimensions=required_dimensions(chapter.kind, exam),
-                full_essay=chapter.kind == ChapterKind.CHEFE,
+                spec=grading_spec(chapter.kind, exam),
             )
         )
 
+        lens = project_lens(outcome.scores, exam, chapter.kind)
         stored = self._submissions.store(
             NewSubmission(
                 user_id=request.user_id,
@@ -123,6 +123,7 @@ class SubmitArgumentUseCase:
             ),
             outcome,
             context.ruler,
+            lens,
         )
 
         new_status = next_status_for(outcome.verdict)
@@ -145,5 +146,5 @@ class SubmitArgumentUseCase:
             chapter_status=new_status,
             ruler=context.ruler,
             outcome=outcome,
-            lens=project_lens(outcome.scores, exam, chapter.kind),
+            lens=lens,
         )

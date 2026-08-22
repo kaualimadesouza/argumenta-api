@@ -4,9 +4,18 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
+from argumenta.adapters.db.models import Evaluation
 from argumenta.domain.enums import ChapterKind, Dimension, Exam
-from argumenta.domain.evaluation import ScoredDimension
+from argumenta.domain.evaluation import (
+    BASE_DIMENSIONS,
+    DimensionScore,
+    EvaluationRuler,
+    ScoredDimension,
+    decide_verdict,
+)
 from argumenta.domain.lenses import (
     LENS_VERSION,
     OFFICIAL_LENSES,
@@ -14,6 +23,8 @@ from argumenta.domain.lenses import (
     required_dimensions,
 )
 from tests.conftest import ScriptedEngine, submit_text
+
+BOSS_TEXT = " ".join(["palavra"] * 300)
 
 _SCORES = {
     Dimension.NORMA_CULTA: 90,
@@ -30,6 +41,41 @@ def _scored(**overrides: int) -> tuple[ScoredDimension, ...]:
         ScoredDimension(dimension=dimension, score=score, evidence="trecho", passed_floor=True)
         for dimension, score in values.items()
     )
+
+
+class TestTheLensNeverMovesTheVerdict:
+    """The point of the whole module: the exam changes what the student SEES,
+    never whether the character was convinced."""
+
+    def test_the_extra_boss_dimension_stays_out_of_the_verdict(self) -> None:
+        five = tuple(
+            DimensionScore(dimension=d, score=70, evidence="trecho") for d in BASE_DIMENSIONS
+        )
+        six = (
+            *five,
+            DimensionScore(dimension=Dimension.PROPOSTA_INTERVENCAO, score=10, evidence="fraca"),
+        )
+        ruler = EvaluationRuler(dimension_floor=40, min_average=50)
+
+        without = decide_verdict(five, ruler)
+        with_proposal = decide_verdict(six, ruler)
+
+        assert (without.verdict, without.average_score) == (
+            with_proposal.verdict,
+            with_proposal.average_score,
+        )
+
+    def test_the_proposal_is_still_scored_and_checked_against_the_floor(self) -> None:
+        scores = (
+            *(DimensionScore(dimension=d, score=70, evidence="trecho") for d in BASE_DIMENSIONS),
+            DimensionScore(dimension=Dimension.PROPOSTA_INTERVENCAO, score=10, evidence="fraca"),
+        )
+
+        decision = decide_verdict(scores, EvaluationRuler(dimension_floor=40, min_average=50))
+
+        proposal = next(s for s in decision.scores if s.dimension == Dimension.PROPOSTA_INTERVENCAO)
+        assert proposal.score == 10
+        assert proposal.passed_floor is False
 
 
 class TestLensMapping:
@@ -122,6 +168,54 @@ class TestFuvestLens:
         assert [c.code for c in official] == ["E1", "E2", "E3"]
         assert view.total_max == 100
 
+    def test_the_total_matches_the_criteria_the_student_can_see(self) -> None:
+        """A student who adds up the axes on screen must land on our total."""
+        view = project_lens(_scored(coesao=80, coerencia=81), Exam.FUVEST, ChapterKind.CONFRONTO)
+
+        official = [c for c in view.criteria if not c.is_argumenta_extra]
+        assert view.total == round(sum(c.score for c in official) / len(official))
+
+    def test_half_points_round_up_instead_of_to_even(self) -> None:
+        """Bankers rounding on a student's grade is indefensible: 80.5 shown as
+        80 in one axis and 82 in the next reads as a bug, because it is one."""
+        low = project_lens(_scored(coesao=80, coerencia=81), Exam.FUVEST, ChapterKind.CONFRONTO)
+        high = project_lens(_scored(coesao=82, coerencia=83), Exam.FUVEST, ChapterKind.CONFRONTO)
+
+        assert next(c.score for c in low.criteria if c.code == "E2") == 81
+        assert next(c.score for c in high.criteria if c.code == "E2") == 83
+
+
+class TestTotalHonesty:
+    """Only the ENEM boss essay has a real board total; everything else is our
+    own aggregation and says so, so the client never renders it as official."""
+
+    def test_enem_boss_total_comes_from_the_board(self) -> None:
+        view = project_lens(_scored(proposta_intervencao=100), Exam.ENEM, ChapterKind.CHEFE)
+
+        assert view.total_max == 1000
+        assert view.scale_source == "board"
+
+    def test_enem_confronto_total_is_ours_because_the_board_has_no_partial_scale(
+        self,
+    ) -> None:
+        view = project_lens(_scored(), Exam.ENEM, ChapterKind.CONFRONTO)
+
+        assert view.total_max == 800
+        assert view.scale_source == "argumenta"
+
+    def test_fuvest_total_is_ours_until_the_calibration_suite_settles_it(self) -> None:
+        view = project_lens(_scored(), Exam.FUVEST, ChapterKind.CONFRONTO)
+
+        assert view.scale_source == "argumenta"
+
+    def test_a_criterion_without_scores_leaves_the_total_undefined(self) -> None:
+        """Replaying an old five-dimension evaluation into the boss lens must
+        not silently degrade 1000 into 800."""
+        view = project_lens(_scored(), Exam.ENEM, ChapterKind.CHEFE)
+
+        assert view.total is None
+        assert [c.code for c in view.criteria if c.code == "C5"] == []
+
 
 class TestRequiredDimensions:
     def test_confronto_asks_for_the_five_internal_dimensions(self) -> None:
@@ -180,6 +274,22 @@ class TestSubmissionLens:
             "E3",
         ]
 
+    def test_the_lens_that_showed_the_correction_is_stored_with_it(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        db_engine: Engine,
+    ) -> None:
+        """LENS_VERSION only means something if an old evaluation can be
+        replayed into the mapping that produced it."""
+        client, chapter_id = game
+
+        submit_text(client, chapter_id)
+
+        with Session(db_engine) as session:
+            stored = session.scalars(select(Evaluation)).one()
+        assert stored.lens_version == LENS_VERSION
+        assert stored.exam == Exam.ENEM
+
     def test_boss_chapter_grades_the_intervention_proposal(
         self, boss_game: tuple[TestClient, uuid.UUID], engine_double: ScriptedEngine
     ) -> None:
@@ -212,6 +322,3 @@ class TestSubmissionLens:
         response = submit_text(client, boss_chapter_id, body=BOSS_TEXT)
 
         assert response.status_code == 502
-
-
-BOSS_TEXT = " ".join(["palavra"] * 300)

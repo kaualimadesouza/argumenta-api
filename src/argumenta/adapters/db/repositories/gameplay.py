@@ -21,6 +21,7 @@ from argumenta.application.gameplay.ports import NewSubmission, StoredEvaluation
 from argumenta.domain.enums import ChapterStatus
 from argumenta.domain.errors import DailyLimitReachedError
 from argumenta.domain.evaluation import EvaluationOutcome, EvaluationRuler
+from argumenta.domain.lenses import LensView
 from argumenta.domain.submission import ChapterEvaluationContext
 from argumenta.domain.track import ChapterContent
 
@@ -70,6 +71,7 @@ class SqlAlchemySubmissionRepository:
         submission: NewSubmission,
         outcome: EvaluationOutcome,
         ruler: EvaluationRuler,
+        lens: LensView,
     ) -> StoredEvaluation:
         attempt_number = self._session.execute(
             select(func.coalesce(func.max(Submission.attempt_number), 0) + 1).where(
@@ -100,6 +102,8 @@ class SqlAlchemySubmissionRepository:
             min_average=ruler.min_average,
             model=outcome.model,
             prompt_version=outcome.prompt_version,
+            lens_version=lens.version,
+            exam=lens.exam,
             latency_ms=outcome.latency_ms,
             input_tokens=outcome.input_tokens,
             output_tokens=outcome.output_tokens,

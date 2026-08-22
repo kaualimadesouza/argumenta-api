@@ -1,33 +1,34 @@
-"""Exam lenses: how the 5 internal dimensions are shown to a student aiming at
-a given exam, and which dimensions the engine must grade.
+"""Exam lenses: how the internal dimensions are shown to a student aiming at a
+given exam, and what the engine is asked to grade in each kind of chapter.
 
-The correction is ALWAYS the same internally (same dimensions, same ruler, same
-verdict rule); the lens is presentation only. The single exception is the boss
-essay under the ENEM lens, where the exam itself demands an intervention
-proposal, so the engine is asked for one extra dimension.
+The correction is the same for everyone: the same BASE_DIMENSIONS, the same
+ruler, and a verdict built only from them (see decide_verdict). A lens changes
+what the student SEES. The one thing it changes upstream is whether the boss
+essay is also graded on the ENEM intervention proposal, and that dimension is
+deliberately outside the verdict, so two students with the same text get the
+same outcome whichever vestibular they picked.
 
 This mapping is versioned like the prompt (LENS_VERSION): changing a criterion,
-a scale or a dimension assignment MUST bump it, so a stored evaluation can
-always be replayed into the lens that produced it.
+a scale or a dimension assignment MUST bump it, and the version is stored with
+each evaluation so an old correction can be replayed into the lens that showed
+it.
 """
 
-import enum
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 from argumenta.domain.enums import ChapterKind, Dimension, Exam
-from argumenta.domain.evaluation import ScoredDimension
+from argumenta.domain.evaluation import BASE_DIMENSIONS, ScoredDimension
 
 LENS_VERSION = "lens-v1.0"
 
 INTERNAL_SCALE_MAX = 100
 """Every dimension is scored 0-100 internally, whatever the lens shows."""
 
-
-class LensAggregation(enum.StrEnum):
-    """How the exam board builds the headline number out of its criteria."""
-
-    SUM = "sum"
-    MEAN = "mean"
+ScaleSource = Literal["board", "argumenta"]
+"""Who owns the total: the exam board, or us. The client must not render our
+own aggregation as an official grade."""
 
 
 @dataclass(frozen=True)
@@ -38,8 +39,6 @@ class CriterionMapping:
     """Internal dimensions averaged into this criterion."""
     scale_max: int
     boss_only: bool = False
-    is_argumenta_extra: bool = False
-    """Shown next to the official criteria, never counted in the exam total."""
 
 
 @dataclass(frozen=True)
@@ -47,16 +46,24 @@ class ExamLens:
     exam: Exam
     criteria: tuple[CriterionMapping, ...]
     """Official criteria of the board, in display order."""
-    aggregation: LensAggregation
     extra_criteria: tuple[CriterionMapping, ...] = field(default_factory=tuple)
+    """Argumenta criteria shown beside the official ones, never in the total."""
+    normalize_to: int | None = None
+    """None sums the criteria (ENEM); a value averages them onto that scale."""
+    board_total_kinds: frozenset[ChapterKind] = frozenset()
+    """Chapter kinds where the total is the board's own scale, not ours."""
+    grades_intervention_proposal: bool = False
+    """Whether a boss essay under this lens is also graded on the proposal."""
 
-    def criteria_for(self, kind: ChapterKind) -> tuple[CriterionMapping, ...]:
-        official = tuple(
+    def official_for(self, kind: ChapterKind) -> tuple[CriterionMapping, ...]:
+        return tuple(
             criterion
             for criterion in self.criteria
             if not criterion.boss_only or kind == ChapterKind.CHEFE
         )
-        return official + self.extra_criteria
+
+    def criteria_for(self, kind: ChapterKind) -> tuple[CriterionMapping, ...]:
+        return self.official_for(kind) + self.extra_criteria
 
 
 @dataclass(frozen=True)
@@ -73,9 +80,19 @@ class LensView:
     exam: Exam
     version: str
     criteria: tuple[LensCriterion, ...]
-    total: int
-    total_max: int
-    """Official total only: the Argumenta criterion is shown, never added in."""
+    total: int | None
+    """None when the lens cannot state a total for what was graded."""
+    total_max: int | None
+    scale_source: ScaleSource
+
+
+@dataclass(frozen=True)
+class GradingSpec:
+    """What the engine must produce for one chapter under one lens: the two
+    values are one decision, so they cannot contradict each other."""
+
+    dimensions: tuple[Dimension, ...]
+    full_essay: bool
 
 
 _PERSUASION_CRITERION = CriterionMapping(
@@ -83,7 +100,6 @@ _PERSUASION_CRITERION = CriterionMapping(
     label="Persuasao (criterio Argumenta)",
     dimensions=(Dimension.PERSUASAO,),
     scale_max=INTERNAL_SCALE_MAX,
-    is_argumenta_extra=True,
 )
 
 ENEM_LENS = ExamLens(
@@ -121,9 +137,12 @@ ENEM_LENS = ExamLens(
             boss_only=True,
         ),
     ),
-    aggregation=LensAggregation.SUM,
     extra_criteria=(_PERSUASION_CRITERION,),
+    board_total_kinds=frozenset({ChapterKind.CHEFE}),
+    grades_intervention_proposal=True,
 )
+"""Only the boss essay has a real ENEM total (0-1000, the five competences).
+There is no official 0-800 partial grade, so the confronto total is ours."""
 
 FUVEST_LENS = ExamLens(
     exam=Exam.FUVEST,
@@ -147,12 +166,12 @@ FUVEST_LENS = ExamLens(
             scale_max=INTERNAL_SCALE_MAX,
         ),
     ),
-    aggregation=LensAggregation.MEAN,
     extra_criteria=(_PERSUASION_CRITERION,),
+    normalize_to=INTERNAL_SCALE_MAX,
 )
-"""FUVEST publishes the three axes but not a stable public per-axis scale, so
-the axes keep the internal 0-100 scale until the calibration suite (issue #12)
-settles the conversion. The mapping itself is what the criterion promises."""
+"""FUVEST publishes the three axes but not a per-axis scale stable enough to
+pin here, so the axes keep the internal 0-100 and the total is ours, labelled
+as such, until the calibration suite (issue #12) settles the conversion."""
 
 OFFICIAL_LENSES: dict[Exam, ExamLens] = {
     Exam.ENEM: ENEM_LENS,
@@ -160,56 +179,79 @@ OFFICIAL_LENSES: dict[Exam, ExamLens] = {
 }
 
 DEFAULT_EXAM = Exam.ENEM
-"""Lens used while the student has no active exam target."""
+"""Lens used while the student has no active exam target. Safe as a default
+precisely because the lens does not touch the verdict."""
+
+
+def grading_spec(kind: ChapterKind, exam: Exam) -> GradingSpec:
+    """The base dimensions always, plus the ENEM intervention proposal in a
+    boss essay. Derived from the chapter, never from display configuration:
+    removing a criterion from a lens must not silently stop the engine from
+    scoring a dimension the verdict depends on."""
+    proposal = kind == ChapterKind.CHEFE and OFFICIAL_LENSES[exam].grades_intervention_proposal
+    dimensions = (*BASE_DIMENSIONS, Dimension.PROPOSTA_INTERVENCAO) if proposal else BASE_DIMENSIONS
+    return GradingSpec(dimensions=dimensions, full_essay=kind == ChapterKind.CHEFE)
 
 
 def required_dimensions(kind: ChapterKind, exam: Exam) -> tuple[Dimension, ...]:
-    """What the engine must score for this chapter under this lens."""
-    lens = OFFICIAL_LENSES[exam]
-    return tuple(
-        dimension for criterion in lens.criteria_for(kind) for dimension in criterion.dimensions
-    )
+    return grading_spec(kind, exam).dimensions
 
 
 def project_lens(scores: tuple[ScoredDimension, ...], exam: Exam, kind: ChapterKind) -> LensView:
     """Aggregates the internal scores into the criteria the student expects to
-    see. Criteria whose dimensions were not graded are simply not shown."""
+    see. A criterion whose dimensions were not graded is not shown, and then
+    the lens states no total instead of quietly shrinking the scale."""
     lens = OFFICIAL_LENSES[exam]
     by_dimension = {score.dimension: score.score for score in scores}
-    criteria: list[LensCriterion] = []
-    official_scores: list[float] = []
-    total_max = 0
+    official = _views(lens.official_for(kind), by_dimension, is_extra=False)
+    extras = _views(lens.extra_criteria, by_dimension, is_extra=True)
 
-    for mapping in lens.criteria_for(kind):
-        graded = [by_dimension[d] for d in mapping.dimensions if d in by_dimension]
-        if not graded:
-            continue
-        value = sum(graded) / len(graded) * mapping.scale_max / INTERNAL_SCALE_MAX
-        criteria.append(
-            LensCriterion(
-                code=mapping.code,
-                label=mapping.label,
-                score=round(value),
-                scale_max=mapping.scale_max,
-                is_argumenta_extra=mapping.is_argumenta_extra,
-            )
-        )
-        if not mapping.is_argumenta_extra:
-            official_scores.append(value)
-            total_max += mapping.scale_max
-
+    complete = len(official) == len(lens.official_for(kind))
+    official_max = sum(criterion.scale_max for criterion in official)
+    shown_total = sum(criterion.score for criterion in official)
     return LensView(
         exam=exam,
         version=LENS_VERSION,
-        criteria=tuple(criteria),
-        total=_aggregate(official_scores, lens.aggregation),
-        total_max=total_max if lens.aggregation == LensAggregation.SUM else INTERNAL_SCALE_MAX,
+        criteria=(*official, *extras),
+        total=_total(shown_total, official_max, lens) if complete else None,
+        total_max=(lens.normalize_to or official_max) if complete else None,
+        scale_source="board" if kind in lens.board_total_kinds else "argumenta",
     )
 
 
-def _aggregate(values: list[float], aggregation: LensAggregation) -> int:
-    if not values:
-        return 0
-    if aggregation == LensAggregation.SUM:
-        return round(sum(values))
-    return round(sum(values) / len(values))
+def _views(
+    mappings: tuple[CriterionMapping, ...],
+    by_dimension: dict[Dimension, int],
+    is_extra: bool,
+) -> tuple[LensCriterion, ...]:
+    views = (_view(mapping, by_dimension, is_extra) for mapping in mappings)
+    return tuple(view for view in views if view is not None)
+
+
+def _view(
+    mapping: CriterionMapping, by_dimension: dict[Dimension, int], is_extra: bool
+) -> LensCriterion | None:
+    graded = [by_dimension[d] for d in mapping.dimensions if d in by_dimension]
+    if not graded:
+        return None
+    return LensCriterion(
+        code=mapping.code,
+        label=mapping.label,
+        score=_rescale(sum(graded) / len(graded), mapping.scale_max),
+        scale_max=mapping.scale_max,
+        is_argumenta_extra=is_extra,
+    )
+
+
+def _total(shown_total: int, official_max: int, lens: ExamLens) -> int:
+    """Aggregates over the numbers on screen, so the student can add them up."""
+    if lens.normalize_to is None or not official_max:
+        return shown_total
+    return _rescale(shown_total * INTERNAL_SCALE_MAX / official_max, lens.normalize_to)
+
+
+def _rescale(value: float, scale_max: int) -> int:
+    """Half up, never bankers rounding: a grade that flips between 80 and 82 on
+    consecutive half points reads as a bug to the student, and is one."""
+    scaled = Decimal(value) * scale_max / INTERNAL_SCALE_MAX
+    return int(scaled.quantize(Decimal(1), rounding=ROUND_HALF_UP))

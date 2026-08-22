@@ -100,6 +100,7 @@ class ScriptedEngine:
         "approved": {},
         "failed_technical": {Dimension.NORMA_CULTA: 20},
         "failed_persuasion": {Dimension.PERSUASAO: 20},
+        "weak_proposal": {Dimension.PROPOSTA_INTERVENCAO: 10},
     }
     BASE_DIMENSIONS: ClassVar[tuple[Dimension, ...]] = (
         Dimension.NORMA_CULTA,

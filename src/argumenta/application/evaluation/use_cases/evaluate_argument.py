@@ -14,6 +14,7 @@ from argumenta.domain.evaluation import (
     EvaluationRuler,
     decide_verdict,
 )
+from argumenta.domain.lenses import GradingSpec
 
 
 @dataclass(frozen=True)
@@ -26,8 +27,9 @@ class EvaluateArgument:
     max_words: int
     ruler: EvaluationRuler
     """Floor and minimum average frozen from the story at submission time."""
-    required_dimensions: tuple[Dimension, ...]
-    full_essay: bool
+    spec: GradingSpec
+    """What the engine must grade here: dimensions and text format, as one
+    decision so the two cannot contradict each other."""
 
 
 class EvaluateArgumentUseCase:
@@ -56,11 +58,11 @@ class EvaluateArgumentUseCase:
                 min_words=request.min_words,
                 max_words=request.max_words,
                 spelling_anchors=anchors,
-                required_dimensions=request.required_dimensions,
-                full_essay=request.full_essay,
+                required_dimensions=request.spec.dimensions,
+                full_essay=request.spec.full_essay,
             )
         )
-        self._ensure_complete(result.scores, request.required_dimensions)
+        self._ensure_complete(result.scores, request.spec.dimensions)
         decision = decide_verdict(result.scores, request.ruler)
         return EvaluationOutcome(
             verdict=decision.verdict,
@@ -81,7 +83,7 @@ class EvaluateArgumentUseCase:
         """Holds for every engine, not just the Claude adapter: a correction
         missing a required dimension would silently distort the lens."""
         graded = {score.dimension for score in scores}
-        if graded != set(required):
+        if len(scores) != len(required) or graded != set(required):
             raise EvaluationFailedError(
                 f"engine graded {sorted(graded)}, expected {sorted(set(required))}"
             )

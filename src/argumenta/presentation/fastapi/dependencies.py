@@ -215,8 +215,6 @@ def get_submit_argument_use_case(
     activity: Annotated[SqlAlchemyDailyActivityWriter, Depends(get_daily_activity_writer)],
     drafts: Annotated[SqlAlchemyDraftRepository, Depends(get_draft_repository)],
     evaluate: Annotated[EvaluateArgumentUseCase, Depends(get_evaluate_argument_use_case)],
-    targets: Annotated[SqlAlchemyExamTargetRepository, Depends(get_exam_target_repository)],
+    exams: Annotated[SqlAlchemyExamTargetRepository, Depends(get_exam_target_repository)],
 ) -> SubmitArgumentUseCase:
-    return SubmitArgumentUseCase(
-        contexts, submissions, progress, activity, drafts, evaluate, targets
-    )
+    return SubmitArgumentUseCase(contexts, submissions, progress, activity, drafts, evaluate, exams)

@@ -18,6 +18,7 @@ from argumenta.domain.enums import (
     Severity,
     Verdict,
 )
+from argumenta.domain.lenses import ScaleSource
 from argumenta.presentation.fastapi.dependencies import (
     CurrentUserId,
     get_draft_repository,
@@ -69,8 +70,11 @@ class LensResponse(BaseModel):
     exam: Exam
     version: str
     criteria: list[LensCriterionResponse]
-    total: int
-    total_max: int
+    total: int | None
+    total_max: int | None
+    scale_source: ScaleSource
+    """"board" is the exam board's own scale; "argumenta" is our aggregation and
+    must not be rendered as an official grade."""
 
 
 class SubmissionResponse(BaseModel):
@@ -157,6 +161,7 @@ def submit_argument(
             ],
             total=result.lens.total,
             total_max=result.lens.total_max,
+            scale_source=result.lens.scale_source,
         ),
     )
 
