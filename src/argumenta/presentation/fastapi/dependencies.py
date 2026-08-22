@@ -18,6 +18,7 @@ from argumenta.adapters.db.repositories.gameplay import (
     SqlAlchemySubmissionRepository,
 )
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
+from argumenta.adapters.db.repositories.progress import SqlAlchemyStatsRepository
 from argumenta.adapters.db.repositories.reactions import SqlAlchemyReactionRepository
 from argumenta.adapters.db.repositories.telemetry import SqlAlchemyTelemetryRepository
 from argumenta.adapters.db.repositories.track import (
@@ -140,6 +141,10 @@ def get_progress_repository(session: DbSession) -> SqlAlchemyProgressRepository:
 
 def get_activity_repository(session: DbSession) -> SqlAlchemyActivityRepository:
     return SqlAlchemyActivityRepository(session)
+
+
+def get_stats_repository(session: DbSession) -> SqlAlchemyStatsRepository:
+    return SqlAlchemyStatsRepository(session)
 
 
 def get_evaluation_context_repository(

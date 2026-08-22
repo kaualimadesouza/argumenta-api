@@ -98,7 +98,7 @@ def get_track(
                 cover_asset=item.story.cover_asset,
                 state=item.state,
                 chapters_passed=item.chapters_passed,
-                chapters_total=item.chapters_total,
+                chapters_total=len(item.story.chapter_ids),
             )
             for item in view.stories
         ],

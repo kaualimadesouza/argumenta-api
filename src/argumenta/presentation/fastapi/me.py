@@ -13,6 +13,8 @@ from argumenta.application.accounts.use_cases import (
     RemoveExamTargetUseCase,
     SetActiveExamTarget,
     SetActiveExamTargetUseCase,
+    UpdateNickname,
+    UpdateNicknameUseCase,
 )
 from argumenta.presentation.fastapi.dependencies import (
     AppSettings,
@@ -25,6 +27,7 @@ from argumenta.presentation.fastapi.schemas import (
     AddTargetRequest,
     MeResponse,
     TargetResponse,
+    UpdateMeRequest,
     UserResponse,
 )
 
@@ -56,6 +59,16 @@ def delete_me(
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/auth")
     return AccountDeletionResponse.from_domain(receipt)
+
+
+@router.patch("")
+def update_me(body: UpdateMeRequest, user_id: CurrentUserId, accounts: Accounts) -> UserResponse:
+    """The only editable field of the profile: a Google sign-up gets its nickname
+    from the e-mail local part, so this is where the student fixes it."""
+    user = UpdateNicknameUseCase(accounts).execute(
+        UpdateNickname(user_id=user_id, nickname=body.nickname)
+    )
+    return UserResponse.from_domain(user)
 
 
 @router.post("/targets", status_code=201)

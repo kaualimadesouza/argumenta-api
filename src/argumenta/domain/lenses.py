@@ -183,6 +183,16 @@ DEFAULT_EXAM = Exam.ENEM
 precisely because the lens does not touch the verdict."""
 
 
+def criterion_for(exam: Exam, dimension: Dimension) -> CriterionMapping | None:
+    """Which criterion of the lens labels this internal dimension. Feeds
+    per-dimension views (the progress series), never a total."""
+    lens = OFFICIAL_LENSES[exam]
+    for criterion in (*lens.criteria, *lens.extra_criteria):
+        if dimension in criterion.dimensions:
+            return criterion
+    return None
+
+
 def grading_spec(kind: ChapterKind, exam: Exam) -> GradingSpec:
     """The base dimensions always, plus the ENEM intervention proposal in a
     boss essay. Derived from the chapter, never from display configuration:

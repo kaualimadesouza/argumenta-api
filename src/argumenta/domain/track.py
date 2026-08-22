@@ -85,6 +85,38 @@ def derive_story_state(
     return StoryState.LOCKED
 
 
+@dataclass(frozen=True)
+class StoryProgress:
+    story: StorySummary
+    state: StoryState
+    chapters_passed: int
+
+
+def fold_stories(
+    stories: list[StorySummary],
+    progress: dict[uuid.UUID, ChapterStatus],
+) -> tuple[StoryProgress, ...]:
+    """The track in order, each story gated by whether the previous one is
+    complete. Pure: unlocking is the caller's decision, not this fold's."""
+    folded: list[StoryProgress] = []
+    previous_completed = True
+    for story in stories:
+        state = derive_story_state(story.chapter_ids, progress, previous_completed)
+        folded.append(
+            StoryProgress(
+                story=story,
+                state=state,
+                chapters_passed=sum(
+                    1
+                    for chapter_id in story.chapter_ids
+                    if progress.get(chapter_id) == ChapterStatus.PASSED
+                ),
+            )
+        )
+        previous_completed = state == StoryState.COMPLETED
+    return tuple(folded)
+
+
 def next_playable_chapter(
     stories: list[StorySummary],
     progress: dict[uuid.UUID, ChapterStatus],
