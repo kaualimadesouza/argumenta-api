@@ -17,6 +17,7 @@ first; do not improvise the workflow from memory.
 | Starting/finishing an issue, opening a PR, the kanban board | `card-workflow` |
 | Adding features, endpoints, use cases, repositories, new modules | `hexagonal-structure` |
 | Writing ANY code (tests come first) | `tdd` |
+| Writing ANY Portuguese a student reads (story content, labels, copy) | `portuguese-copy` |
 | Reviewing a PR/diff before merge (mandatory for EVERY PR) | `thermo-nuclear-code-quality-review` |
 
 Almost every coding session touches at least `card-workflow` (process) and
@@ -33,6 +34,11 @@ Almost every coding session touches at least `card-workflow` (process) and
   (`feat:`/`fix:`/`chore:`/`docs:`/`ci:`), body with `Closes #<n>`.
 - Code, identifiers, comments, commit messages and PR descriptions in English.
   Issues and product docs are in Portuguese.
+- **Correct pt-BR in every string a student reads** (owner decision, details in
+  the `portuguese-copy` skill): full accentuation, crase and hyphenation in story
+  content, personas, objectives, hints, lens labels and any Portuguese prose. A
+  product that grades spelling cannot ship `"Voce e presidente do gremio"`.
+  Slugs, enum values and identifiers stay unaccented ASCII on purpose.
 - **Objects and ORM, never dicts** (owner decision): every function input/output
   shape is a dataclass or pydantic model; persistence goes through the SQLAlchemy
   ORM (no raw SQL rows, no dict payloads between layers). Returning a tuple of

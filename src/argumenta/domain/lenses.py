@@ -97,7 +97,7 @@ class GradingSpec:
 
 _PERSUASION_CRITERION = CriterionMapping(
     code="ARG",
-    label="Persuasao (criterio Argumenta)",
+    label="Persuasão (critério Argumenta)",
     dimensions=(Dimension.PERSUASAO,),
     scale_max=INTERNAL_SCALE_MAX,
 )
@@ -107,31 +107,31 @@ ENEM_LENS = ExamLens(
     criteria=(
         CriterionMapping(
             code="C1",
-            label="Dominio da norma culta",
+            label="Domínio da norma culta",
             dimensions=(Dimension.NORMA_CULTA,),
             scale_max=200,
         ),
         CriterionMapping(
             code="C2",
-            label="Compreensao da proposta e repertorio",
+            label="Compreensão da proposta e repertório",
             dimensions=(Dimension.REPERTORIO,),
             scale_max=200,
         ),
         CriterionMapping(
             code="C3",
-            label="Selecao e organizacao dos argumentos",
+            label="Seleção e organização dos argumentos",
             dimensions=(Dimension.COERENCIA,),
             scale_max=200,
         ),
         CriterionMapping(
             code="C4",
-            label="Mecanismos linguisticos de coesao",
+            label="Mecanismos linguísticos de coesão",
             dimensions=(Dimension.COESAO,),
             scale_max=200,
         ),
         CriterionMapping(
             code="C5",
-            label="Proposta de intervencao",
+            label="Proposta de intervenção",
             dimensions=(Dimension.PROPOSTA_INTERVENCAO,),
             scale_max=200,
             boss_only=True,
@@ -161,7 +161,7 @@ FUVEST_LENS = ExamLens(
         ),
         CriterionMapping(
             code="E3",
-            label="Expressao",
+            label="Expressão",
             dimensions=(Dimension.NORMA_CULTA,),
             scale_max=INTERNAL_SCALE_MAX,
         ),
