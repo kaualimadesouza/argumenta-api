@@ -22,16 +22,22 @@ class SqlLlmBudget:
         self._alert_ratio = alert_ratio
 
     def _spent_this_month(self) -> int:
+        """Both directions of both callers: a reaction prompt carries the whole
+        student text, so its input tokens dominate its own cost."""
         month_start = datetime.now(tz=UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         evaluation_tokens = self._session.scalar(
             select(
                 func.coalesce(func.sum(Evaluation.input_tokens), 0)
                 + func.coalesce(func.sum(Evaluation.output_tokens), 0)
-            ).where(Evaluation.created_at >= month_start)
+            ).where(Evaluation.created_at >= month_start, Evaluation.deleted_at.is_(None))
         )
         reaction_tokens = self._session.scalar(
-            select(func.coalesce(func.sum(CharacterReaction.output_tokens), 0)).where(
-                CharacterReaction.created_at >= month_start
+            select(
+                func.coalesce(func.sum(CharacterReaction.input_tokens), 0)
+                + func.coalesce(func.sum(CharacterReaction.output_tokens), 0)
+            ).where(
+                CharacterReaction.created_at >= month_start,
+                CharacterReaction.deleted_at.is_(None),
             )
         )
         return int(evaluation_tokens or 0) + int(reaction_tokens or 0)

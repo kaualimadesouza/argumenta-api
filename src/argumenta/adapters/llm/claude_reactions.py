@@ -54,5 +54,6 @@ class ClaudeReactionEngine:
             body=body,
             model=self._model,
             prompt_version=PROMPT_VERSION,
+            input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
         )

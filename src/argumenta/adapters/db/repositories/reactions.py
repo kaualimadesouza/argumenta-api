@@ -1,11 +1,11 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from argumenta.adapters.db.models import (
     Chapter,
-    ChapterBeat,
     Character,
     CharacterReaction,
     Evaluation,
@@ -16,7 +16,7 @@ from argumenta.application.reactions.ports import (
     ReactionText,
     StoredReaction,
 )
-from argumenta.domain.enums import BeatType, Branch, ReactionBeat
+from argumenta.domain.enums import ReactionBeat
 
 
 class SqlAlchemyReactionRepository:
@@ -36,6 +36,8 @@ class SqlAlchemyReactionRepository:
                 Submission.deleted_at.is_(None),
                 Evaluation.is_current,
                 Evaluation.deleted_at.is_(None),
+                Chapter.deleted_at.is_(None),
+                Character.deleted_at.is_(None),
             )
         ).one_or_none()
         if row is None:
@@ -44,56 +46,58 @@ class SqlAlchemyReactionRepository:
         return ReactionContext(
             verdict=verdict,
             student_text=student_text,
+            chapter_id=chapter_id,
             character_id=character.id,
             character_name=character.name,
             persona_brief=character.persona_brief,
             chapter_objective=objective,
-            scripted_rebuttal=self._first_consequence_dialogue(chapter_id),
         )
 
-    def _first_consequence_dialogue(self, chapter_id: uuid.UUID) -> str | None:
-        return self._session.scalar(
-            select(ChapterBeat.body)
-            .where(
-                ChapterBeat.chapter_id == chapter_id,
-                ChapterBeat.branch == Branch.CONSEQUENCE,
-                ChapterBeat.beat_type == BeatType.DIALOGUE,
-                ChapterBeat.deleted_at.is_(None),
-            )
-            .order_by(ChapterBeat.position)
-            .limit(1)
-        )
-
-    def find(self, submission_id: uuid.UUID) -> StoredReaction | None:
+    def find(
+        self, user_id: uuid.UUID, submission_id: uuid.UUID, beat: ReactionBeat
+    ) -> StoredReaction | None:
         row = self._session.execute(
             select(CharacterReaction.beat, CharacterReaction.body, Character.name)
             .join(Character, Character.id == CharacterReaction.character_id)
+            .join(Submission, Submission.id == CharacterReaction.submission_id)
             .where(
                 CharacterReaction.submission_id == submission_id,
+                CharacterReaction.beat == beat,
                 CharacterReaction.deleted_at.is_(None),
+                Submission.user_id == user_id,
+                Submission.deleted_at.is_(None),
             )
         ).one_or_none()
         if row is None:
             return None
-        beat, body, character_name = row
-        return StoredReaction(beat=beat, character_name=character_name, body=body)
+        stored_beat, body, character_name = row
+        return StoredReaction(beat=stored_beat, character_name=character_name, body=body)
 
     def store(
         self,
         submission_id: uuid.UUID,
         character_id: uuid.UUID,
         beat: ReactionBeat,
-        text: ReactionText,
+        reaction: ReactionText,
     ) -> None:
-        self._session.add(
-            CharacterReaction(
+        """Concurrent requests race here, and the partial unique on
+        (submission_id, beat) is what decides: the loser keeps its generated
+        text and the reader sees the winner's line."""
+        self._session.execute(
+            insert(CharacterReaction)
+            .values(
                 submission_id=submission_id,
                 character_id=character_id,
                 beat=beat,
-                body=text.body,
-                model=text.model,
-                prompt_version=text.prompt_version,
-                output_tokens=text.output_tokens,
+                body=reaction.body,
+                model=reaction.model,
+                prompt_version=reaction.prompt_version,
+                input_tokens=reaction.input_tokens,
+                output_tokens=reaction.output_tokens,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["submission_id", "beat"],
+                index_where=text("deleted_at IS NULL"),
             )
         )
         self._session.flush()

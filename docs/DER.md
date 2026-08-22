@@ -295,6 +295,7 @@ erDiagram
     text body
     text model
     text prompt_version
+    integer input_tokens
     integer output_tokens
     timestamptz created_at
     timestamptz updated_at
@@ -350,7 +351,13 @@ Notas:
 - `drafts` é o rascunho com autosave, apagado quando o capítulo é aprovado.
 - `character_reactions` guarda o que a IA fez o personagem responder ao texto real
   do aluno (rebate, convencido, abertura da consequência, chamada da recuperação),
-  com custo em tokens para monitorar a conta de LLM.
+  com custo em tokens (`input_tokens` e `output_tokens`, porque o prompt da reação
+  carrega o texto do aluno e domina o custo) para monitorar a conta de LLM.
+  Índice único parcial `UNIQUE (submission_id, beat) WHERE deleted_at IS NULL`: é
+  uma linha por beat, então o get-or-create da reação é garantia do banco, e os
+  quatro beats convivem na mesma submissão. A fala roteirizada de fallback **não**
+  é gravada: a tabela significa exatamente "gastamos tokens aqui", e a reação real
+  chega quando o motor volta.
 
 ## Domínio 4: hábito e telemetria
 

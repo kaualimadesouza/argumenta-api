@@ -19,6 +19,7 @@ class ReactionText:
     body: str
     model: str
     prompt_version: str
+    input_tokens: int | None
     output_tokens: int | None
 
 
@@ -28,12 +29,11 @@ class ReactionContext:
 
     verdict: Verdict
     student_text: str
+    chapter_id: uuid.UUID
     character_id: uuid.UUID
     character_name: str
     persona_brief: str
     chapter_objective: str
-    scripted_rebuttal: str | None
-    """First dialogue of the consequence branch, the authored fallback."""
 
 
 @dataclass(frozen=True)
@@ -52,12 +52,18 @@ class ReactionRepository(Protocol):
         self, user_id: uuid.UUID, submission_id: uuid.UUID
     ) -> ReactionContext | None: ...
 
-    def find(self, submission_id: uuid.UUID) -> StoredReaction | None: ...
+    def find(
+        self, user_id: uuid.UUID, submission_id: uuid.UUID, beat: ReactionBeat
+    ) -> StoredReaction | None:
+        """Per beat, not per submission: consequence_intro and recovery_prompt
+        share this table (DER). The user filter keeps ownership in the query
+        instead of in the order the use case happens to call things."""
+        ...
 
     def store(
         self,
         submission_id: uuid.UUID,
         character_id: uuid.UUID,
         beat: ReactionBeat,
-        text: ReactionText,
+        reaction: ReactionText,
     ) -> None: ...
