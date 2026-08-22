@@ -87,15 +87,9 @@ def _format_dimensions(required: tuple[Dimension, ...]) -> str:
 
 
 class ClaudeEvaluationEngine:
-    """Claude with forced tool use: the tool schema is what makes the output
-    structured. Sonnet 5 rejects a non-default temperature and thinks
-    adaptively, so repeatability comes from the forced contract and the
-    versioned prompt, never from sampling parameters.
-
-    `effort` defaults to the API default, so this adapter does not quietly
-    change how hard the grader thinks. Lowering it is a decision to take with
-    the calibration suite in hand, not in passing.
-    """
+    """Forced tool use is what makes the output structured. Sonnet 5 rejects a
+    non-default temperature, so repeatability comes from that contract and the
+    versioned prompt; effort stays at the API default (calibration suite owns it)."""
 
     def __init__(
         self,
@@ -106,8 +100,8 @@ class ClaudeEvaluationEngine:
         timeout: float = 90.0,
         max_retries: int = 1,
     ) -> None:
-        # the call happens inside an open transaction, so the SDK default of ten
-        # minutes would hold a pool connection idle in transaction that long
+        # one retry, because a timed out call is billed server side and the
+        # retry is billed again without either being recorded
         self._client = anthropic.Anthropic(
             api_key=api_key, timeout=timeout, max_retries=max_retries
         )

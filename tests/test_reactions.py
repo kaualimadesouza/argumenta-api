@@ -1,16 +1,16 @@
 """Issue #10: AI character reaction to the student's text, tests first (TDD).
-
 Issue #33 adds the race, the authored fallback rule and the repository
-get-or-create, which the first round left to the database alone.
-"""
+get-or-create, which the first round left to the database alone."""
 
+import logging
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,6 @@ from argumenta.domain.errors import EvaluationFailedError, LlmBudgetExceededErro
 from argumenta.domain.reactions import (
     CONVINCED_FALLBACK,
     REBUTTAL_FALLBACK,
-    needs_authored_line,
     reaction_beat_for,
     scripted_reaction,
 )
@@ -87,11 +86,6 @@ class TestScriptedReactionRule:
         authored = [self._beat(BeatType.NARRATION, "so narracao aqui")]
 
         assert scripted_reaction(ReactionBeat.REBUTTAL, authored) == REBUTTAL_FALLBACK
-
-    def test_only_a_rebuttal_needs_the_authored_scene(self) -> None:
-        """Which is why the use case does not pay for that query otherwise."""
-        assert needs_authored_line(ReactionBeat.REBUTTAL) is True
-        assert needs_authored_line(ReactionBeat.CONVINCED) is False
 
 
 class FakeReactionEngine:
@@ -231,6 +225,50 @@ class TestReactionEndpoint:
             assert session.scalars(select(CharacterReaction)).all() == [], (
                 "a scripted fallback costs no tokens and must not freeze the reaction"
             )
+
+    def test_a_retired_line_is_generated_again(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+        reaction_engine: FakeReactionEngine,
+        db_engine: Engine,
+    ) -> None:
+        """What the fallback retirement migration relies on: the lookup reads
+        live rows only, so soft deleting one makes the beat regenerable."""
+        client, chapter_id = game
+        submission_id = _submission_id(client, chapter_id, engine_double, "approved")
+        assert client.post(f"/submissions/{submission_id}/reaction").status_code == 200
+        with Session(db_engine) as session:
+            session.execute(update(CharacterReaction).values(deleted_at=datetime.now(tz=UTC)))
+            session.commit()
+
+        client.post(f"/submissions/{submission_id}/reaction")
+
+        assert len(reaction_engine.calls) == 2
+        with Session(db_engine) as session:
+            live = session.scalars(
+                select(CharacterReaction).where(CharacterReaction.deleted_at.is_(None))
+            ).one()
+            assert live.model == "claude-sonnet-5"
+
+    def test_the_fallback_is_logged_with_enough_to_find_the_student(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+        reaction_engine: FakeReactionEngine,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        client, chapter_id = game
+        reaction_engine.fail_with = EvaluationFailedError("api down")
+        submission_id = _submission_id(client, chapter_id, engine_double, "failed_persuasion")
+
+        with caplog.at_level(logging.WARNING):
+            client.post(f"/submissions/{submission_id}/reaction")
+
+        logged = "\n".join(record.getMessage() for record in caplog.records)
+        assert submission_id in logged
+        assert "beat=rebuttal" in logged
+        assert "EvaluationFailedError" in logged
 
     def test_fallback_is_retried_once_the_engine_recovers(
         self,
@@ -492,6 +530,7 @@ class TestReactionRepository:
         with Session(db_engine) as session:
             stored = session.scalars(select(CharacterReaction)).one()
             first_body = stored.body
+            first_tokens = (stored.input_tokens or 0, stored.output_tokens or 0)
             body = SqlAlchemyReactionRepository(session).store_or_get(
                 stored.submission_id,
                 stored.character_id,
@@ -508,8 +547,12 @@ class TestReactionRepository:
 
         assert body == first_body
         with Session(db_engine) as session:
-            rows = session.scalars(select(CharacterReaction)).all()
-        assert [row.body for row in rows] == [first_body]
+            row = session.scalars(select(CharacterReaction)).one()
+        assert row.body == first_body
+        assert (row.input_tokens, row.output_tokens) == (
+            first_tokens[0] + 1,
+            first_tokens[1] + 1,
+        ), "the loser paid the API too, and the monthly cap reads these columns"
 
 
 def _store_competing_reaction(db_engine: Engine, submission_id: uuid.UUID, body: str) -> None:

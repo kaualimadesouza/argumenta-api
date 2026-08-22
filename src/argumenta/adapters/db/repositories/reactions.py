@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -66,29 +66,30 @@ class SqlAlchemyReactionRepository:
         reaction: ReactionText,
     ) -> str:
         """One statement, so the caller cannot return a line that is not in the
-        database. Concurrent requests race here and the partial unique on
-        (submission_id, beat) is the arbiter: the loser writes nothing and
-        RETURNING hands it the stored line instead of its own text."""
-        stored = self._session.execute(
-            insert(CharacterReaction)
-            .values(
-                submission_id=submission_id,
-                character_id=character_id,
-                beat=beat,
-                body=reaction.body,
-                model=reaction.model,
-                prompt_version=reaction.prompt_version,
-                input_tokens=reaction.input_tokens,
-                output_tokens=reaction.output_tokens,
-            )
-            .on_conflict_do_update(
+        database. The partial unique arbitrates the race: the stored line wins
+        the body, and the loser adds the tokens it was billed anyway."""
+        statement = insert(CharacterReaction).values(
+            submission_id=submission_id,
+            character_id=character_id,
+            beat=beat,
+            body=reaction.body,
+            model=reaction.model,
+            prompt_version=reaction.prompt_version,
+            input_tokens=reaction.input_tokens,
+            output_tokens=reaction.output_tokens,
+        )
+        return self._session.execute(
+            statement.on_conflict_do_update(
                 index_elements=["submission_id", "beat"],
                 index_where=text("deleted_at IS NULL"),
-                # touching nothing: the stored line wins, and DO UPDATE is what
-                # makes RETURNING give it back (DO NOTHING returns no row)
-                set_={"updated_at": CharacterReaction.updated_at},
-            )
-            .returning(CharacterReaction.body)
+                # tokens per beat, not per generation: the loser of the race also
+                # paid the API, and the monthly cap reads exactly these columns
+                set_={
+                    "input_tokens": func.coalesce(CharacterReaction.input_tokens, 0)
+                    + func.coalesce(statement.excluded.input_tokens, 0),
+                    "output_tokens": func.coalesce(CharacterReaction.output_tokens, 0)
+                    + func.coalesce(statement.excluded.output_tokens, 0),
+                    "updated_at": func.now(),
+                },
+            ).returning(CharacterReaction.body)
         ).scalar_one()
-        self._session.flush()
-        return str(stored)

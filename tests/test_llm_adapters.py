@@ -1,10 +1,6 @@
-"""Issue #12: the contract both Claude adapters send and check.
-
-The calibration suite exercises the evaluation adapter against the real API and
-costs tokens; these run on every PR with a fake client, and they exist because
-the request shape is where Sonnet 5 breaks a caller: a non-default temperature
-is a 400, and thinking comes out of max_tokens.
-"""
+"""Issue #12: the contract both Claude adapters send and check, with a fake
+client so they run on every PR. The request shape is where Sonnet 5 breaks a
+caller: a non-default temperature is a 400, and thinking comes out of max_tokens."""
 
 from typing import Any
 
@@ -21,6 +17,8 @@ from argumenta.application.evaluation.ports import EngineRequest
 from argumenta.application.reactions.ports import ReactionRequest
 from argumenta.domain.enums import Dimension, Verdict
 from argumenta.domain.errors import EvaluationFailedError
+from argumenta.presentation.fastapi.dependencies import get_reaction_engine
+from argumenta.settings import get_settings
 
 _GRADED = (
     Dimension.NORMA_CULTA,
@@ -47,11 +45,13 @@ class FakeMessages:
 
 
 class FakeClient:
-    """Stands in for anthropic.Anthropic: records the request kwargs so a test
-    can assert the wire contract without spending a token."""
+    """Stands in for anthropic.Anthropic: records the constructor and request
+    kwargs so a test can assert the wire contract without spending a token."""
 
     def __init__(self, response: Message) -> None:
         self.messages = FakeMessages(response)
+        self.init_kwargs: dict[str, Any] = {}
+        self.constructions = 0
 
 
 def _tool_response(stop_reason: StopReason = "tool_use") -> Message:
@@ -93,7 +93,13 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> Any:
     def install(response: Message) -> FakeClient:
         client = FakeClient(response)
         holder["client"] = client
-        monkeypatch.setattr(anthropic, "Anthropic", lambda **_: client)
+
+        def factory(**kwargs: Any) -> FakeClient:
+            client.init_kwargs = kwargs
+            client.constructions += 1
+            return client
+
+        monkeypatch.setattr(anthropic, "Anthropic", factory)
         return client
 
     return install
@@ -166,6 +172,46 @@ class TestEvaluationRequestContract:
 
         with pytest.raises(EvaluationFailedError, match="max_tokens"):
             ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+
+
+class TestClientBudget:
+    """The SDK defaults (600s read, 2 retries) would hold a pool connection for
+    up to half an hour, because the call runs inside the request transaction."""
+
+    def test_the_evaluation_client_bounds_the_call(self, fake_client: Any) -> None:
+        client = fake_client(_tool_response())
+
+        ClaudeEvaluationEngine(api_key="k", model="claude-sonnet-5").evaluate(_engine_request())
+
+        assert client.init_kwargs["timeout"] == 90.0
+        assert client.init_kwargs["max_retries"] == 1
+
+    def test_the_reaction_client_waits_less(self, fake_client: Any) -> None:
+        client = fake_client(_text_response())
+
+        ClaudeReactionEngine(api_key="k", model="claude-sonnet-5").generate(_reaction_request())
+
+        assert client.init_kwargs["timeout"] == 30.0
+        assert client.init_kwargs["max_retries"] == 1
+
+
+class TestOneClientPerProcess:
+    def test_the_dependency_reuses_the_client_and_reads_the_settings(
+        self, fake_client: Any
+    ) -> None:
+        """A client per request means a connection pool per request; the timeout
+        comes from Settings so a slow model does not need a redeploy."""
+        client = fake_client(_text_response())
+        get_reaction_engine.cache_clear()
+        try:
+            first = get_reaction_engine()
+            second = get_reaction_engine()
+        finally:
+            get_reaction_engine.cache_clear()
+
+        assert first is second
+        assert client.constructions == 1
+        assert client.init_kwargs["timeout"] == get_settings().reaction_timeout_seconds
 
 
 class TestReactionRequestContract:

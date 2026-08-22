@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from argumenta.application.reactions.use_cases import GetCharacterReactionUseCase
 from argumenta.domain.enums import ReactionBeat
@@ -20,9 +20,12 @@ class ReactionResponse(BaseModel):
     beat: ReactionBeat
     character_name: str
     body: str
-    provisional: bool
-    """The line is the authored fallback, not the AI reaction: nothing was
-    stored, and asking again once the engine recovers returns the real one."""
+    provisional: bool = Field(
+        description=(
+            "the line is the authored fallback, not the AI reaction: nothing was "
+            "stored, and asking again once the engine recovers returns the real one"
+        )
+    )
 
 
 @router.post(

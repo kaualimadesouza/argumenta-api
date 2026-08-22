@@ -9,10 +9,16 @@ Mudanças da v0.7 (implementação das issues 10, 11 e 33):
 `UNIQUE (submission_id, beat) WHERE deleted_at IS NULL`, que tira o get-or-create
 da reação das mãos da aplicação; `evaluations.lens_version` e `evaluations.exam`,
 a lente de exibição usada no envio (a lente nunca move o veredito, decisão 27 do
-PRD). A migration que cria esse único **não é expand only**: ela estreita o que o
-release anterior podia escrever, então roda dois backfills antes (aposenta as
-falas gravadas como `model = 'fallback'` e desduplica beats repetidos), e um
-rollback exige `downgrade`, não só voltar a imagem.
+PRD). O rollback dessa migration é voltar a imagem **mantendo o schema**: o
+release anterior nomeia esse único no `on_conflict_do_nothing`, então derrubar o
+índice é que quebra a reação. Antes de criar o índice a migration desduplica os
+beats repetidos que o release da issue 10 podia gravar, e uma revisão própria
+aposenta as falas congeladas como `model = 'fallback'` (separada de propósito:
+dobrada na revisão do índice, nunca alcançaria um banco já marcado com ela).
+
+`character_reactions.input_tokens` e `output_tokens` contam tokens **do beat**,
+não de uma geração: quem perde a corrida do get-or-create também pagou a API, e
+o upsert soma os dois, que é exatamente o que o teto mensal precisa ler.
 
 Mudanças da v0.6: `users.terms_accepted_at`, o registro do aceite da política de
 privacidade e dos termos de uso no cadastro (LGPD; par do card de política de

@@ -26,10 +26,14 @@ class Settings(BaseSettings):
     # thinking effort of the graded correction; "high" is the API default, and
     # changing it moves every score, so the calibration workflow watches this file
     evaluation_effort: Effort = "high"
+    # the call runs inside an open transaction, so the SDK default (600s read,
+    # 2 retries) would pin a pool connection for up to half an hour
+    evaluation_timeout_seconds: float = 90.0
     # character reaction (issue #10): free text, own knob so the flavour beat can
     # move to a cheaper model without touching the graded correction
     reaction_model: str = "claude-sonnet-5"
     reaction_effort: Effort = "low"
+    reaction_timeout_seconds: float = 30.0
     # monthly LLM cap in tokens over evaluations + character_reactions; 0 disables
     llm_monthly_token_budget: int = 10_000_000
     llm_budget_alert_ratio: float = 0.8

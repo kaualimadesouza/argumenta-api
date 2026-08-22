@@ -16,10 +16,9 @@ from argumenta.domain.errors import EvaluationFailedError
 
 
 class ClaudeReactionEngine:
-    """Free text: the reaction is performance, not judgement (the verdict was
-    already decided by the evaluation engine). Low effort and a budget with
-    room to spare, because thinking comes out of max_tokens and a truncated
-    reaction is an empty one."""
+    """Free text: the reaction is performance, not judgement. Low effort and a
+    budget with room to spare, because thinking comes out of max_tokens and a
+    truncated reaction is an empty one."""
 
     def __init__(
         self,
@@ -30,8 +29,8 @@ class ClaudeReactionEngine:
         timeout: float = 30.0,
         max_retries: int = 1,
     ) -> None:
-        # the call happens inside an open transaction, so the SDK default of ten
-        # minutes would hold a pool connection idle in transaction that long
+        # one retry, same trade as the evaluation engine: a transient 429 is
+        # worth retrying, a timeout is billed twice
         self._client = anthropic.Anthropic(
             api_key=api_key, timeout=timeout, max_retries=max_retries
         )

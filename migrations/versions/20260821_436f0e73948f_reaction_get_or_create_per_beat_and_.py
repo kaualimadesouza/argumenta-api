@@ -16,15 +16,6 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-RETIRE_FALLBACK_LINES = """
-UPDATE character_reactions
-SET deleted_at = now(), updated_at = now()
-WHERE deleted_at IS NULL AND model = 'fallback'
-"""
-"""The first release persisted the scripted line as model = 'fallback', so a ten
-minute API outage froze a generic answer forever. Retiring those rows lets the
-real reaction be generated again."""
-
 RETIRE_DUPLICATE_BEATS = """
 UPDATE character_reactions AS duplicate
 SET deleted_at = now(), updated_at = now()
@@ -38,20 +29,15 @@ WHERE duplicate.deleted_at IS NULL
         AND (kept.created_at, kept.id) < (duplicate.created_at, duplicate.id)
   )
 """
-"""The release before this one had no unique index and a get-or-create race, so
-duplicated beats are producible by the code currently deployed. Without this the
-CREATE UNIQUE INDEX below fails on live data, and since the deploy runs
-`alembic upgrade head` before switching traffic, every retry would fail the same
-way and the old container would keep serving the bug. Soft delete, keeping the
-oldest row: that is the line the student already read."""
+"""Issue #10 could write duplicated beats, which the CREATE UNIQUE INDEX below
+would fail on. Edited into this revision on purpose: the dedup has to run before
+the index. Soft delete keeping the oldest live row, id breaking ties."""
 
 
 def upgrade() -> None:
-    # NOT expand only: the partial unique narrows what the release still running
-    # is allowed to write, which makes this a contract step. Rolling back by
-    # pinning the previous image is not enough here, because the old find()
-    # ends in one_or_none() and several beats per submission would raise;
-    # a rollback has to downgrade this revision too.
+    # a rollback pins the previous image and keeps this schema: that release
+    # names this index in on_conflict_do_nothing, so dropping it turns every
+    # reaction into a 42P10 error
     op.add_column(
         'character_reactions',
         sa.Column(
@@ -61,7 +47,6 @@ def upgrade() -> None:
             comment='prompt da reacao domina o custo',
         ),
     )
-    op.execute(RETIRE_FALLBACK_LINES)
     op.execute(RETIRE_DUPLICATE_BEATS)
     op.create_index(
         'uq_character_reactions_submission_beat',

@@ -16,11 +16,7 @@ from argumenta.domain.errors import (
     LlmBudgetExceededError,
     SubmissionNotFoundError,
 )
-from argumenta.domain.reactions import (
-    needs_authored_line,
-    reaction_beat_for,
-    scripted_reaction,
-)
+from argumenta.domain.reactions import reaction_beat_for, scripted_reaction
 
 logger = logging.getLogger(__name__)
 
@@ -31,22 +27,15 @@ class ReactionView:
     character_name: str
     body: str
     provisional: bool
-    """True for the authored fallback: nothing was stored, and the real
-    reaction still arrives once the engine or the budget recovers. The client
-    needs this to mark the beat instead of showing two lines with no
-    explanation."""
+    """True for the authored fallback: nothing was stored, and the real reaction
+    still arrives once the engine or the budget recovers. The client marks the
+    beat instead of showing two lines with no explanation."""
 
 
 class GetCharacterReactionUseCase:
-    """Get-or-create the character's reaction to a judged submission: one LLM
-    call per beat at most, and an authored line when the engine or the monthly
-    budget is unavailable. The scripted line is never stored, so the real
-    reaction still arrives once the engine recovers.
-
-    A row in character_reactions therefore means tokens were spent, but not the
-    other way round: a client that times out, or that loses the race for a beat,
-    was billed without leaving a row.
-    """
+    """Get-or-create the character's reaction: one LLM call per beat at most, and
+    an authored line, never stored, when the engine or the budget is out. A row
+    means tokens were spent; the converse is false (a timeout leaves none)."""
 
     def __init__(
         self,
@@ -84,20 +73,22 @@ class GetCharacterReactionUseCase:
                 )
             )
         except (LlmBudgetExceededError, EvaluationFailedError) as error:
-            logger.warning("character reaction fell back to the authored line: %s", error)
+            logger.warning(
+                "reaction fell back to the authored line: submission=%s beat=%s cause=%s: %s",
+                submission_id,
+                beat.value,
+                type(error).__name__,
+                error,
+            )
             return self._view(beat, context, self._authored(beat, context), provisional=True)
 
         body = self._reactions.store_or_get(submission_id, context.character_id, beat, reaction)
         return self._view(beat, context, body, provisional=False)
 
     def _authored(self, beat: ReactionBeat, context: ReactionContext) -> str:
-        """The scene is only read when the beat has a hand written equivalent,
-        so an approved student does not pay for a query nobody reads."""
-        authored = (
-            self._content.list_beats(context.chapter_id, Branch.CONSEQUENCE)
-            if needs_authored_line(beat)
-            else ()
-        )
+        """Which beats have a hand written equivalent is scripted_reaction's rule
+        alone; asking here too would be the same rule in two modules."""
+        authored = self._content.list_beats(context.chapter_id, Branch.CONSEQUENCE)
         return scripted_reaction(beat, authored)
 
     @staticmethod
