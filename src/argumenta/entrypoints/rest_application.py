@@ -7,6 +7,7 @@ from argumenta.presentation.fastapi.auth import router as auth_router
 from argumenta.presentation.fastapi.body_limit import LimitRequestBody
 from argumenta.presentation.fastapi.health import router as health_router
 from argumenta.presentation.fastapi.me import router as me_router
+from argumenta.presentation.fastapi.progress import router as progress_router
 from argumenta.presentation.fastapi.reactions import router as reactions_router
 from argumenta.presentation.fastapi.submissions import router as submissions_router
 from argumenta.presentation.fastapi.telemetry import router as telemetry_router
@@ -31,6 +32,7 @@ _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EvaluationFailedError: 502,
     errors.SubmissionNotFoundError: 404,
     errors.TelemetryBatchTooLargeError: 413,
+    errors.AccountNotFoundError: 404,
 }
 
 
@@ -42,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(track_router)
+    app.include_router(progress_router)
     app.include_router(submissions_router)
     app.include_router(reactions_router)
     app.include_router(telemetry_router)

@@ -25,6 +25,10 @@ class AccountRepository(Protocol):
 
     def find_user_by_google_subject(self, subject: str) -> UserAccount | None: ...
 
+    def update_nickname(self, user_id: uuid.UUID, nickname: str) -> UserAccount | None:
+        """None when there is no live account with that id."""
+        ...
+
     def is_active(self, user_id: uuid.UUID) -> bool:
         """Tokens are stateless, so this is what ends a session: every request
         asks whether the account is still there."""

@@ -50,6 +50,15 @@ class SqlAlchemyAccountRepository:
         self._session.flush()
         return _to_user_account(row)
 
+    def update_nickname(self, user_id: uuid.UUID, nickname: str) -> UserAccount | None:
+        row = self._session.scalar(
+            update(User)
+            .where(User.id == user_id, User.deleted_at.is_(None))
+            .values(nickname=nickname)
+            .returning(User)
+        )
+        return _to_user_account(row) if row else None
+
     def add_email_identity(self, user_id: uuid.UUID, password_hash: str) -> None:
         self._session.add(
             AuthIdentity(user_id=user_id, provider=AuthProvider.EMAIL, password_hash=password_hash)

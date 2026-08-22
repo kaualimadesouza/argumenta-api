@@ -1,16 +1,20 @@
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
 from argumenta.domain.accounts import ExamTarget, UserAccount
 from argumenta.domain.enums import Exam
 from argumenta.domain.privacy import DeletionReceipt
 
+Nickname = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
+"""Trimmed at the edge: whitespace is not a name, and the column is 40."""
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    nickname: str = Field(min_length=1, max_length=40)
+    nickname: Nickname
     password: str = Field(min_length=8, max_length=128)
     accepted_terms: bool
 
@@ -23,6 +27,10 @@ class LoginRequest(BaseModel):
 class GoogleLoginRequest(BaseModel):
     code: str
     redirect_uri: str
+
+
+class UpdateMeRequest(BaseModel):
+    nickname: Nickname
 
 
 class AddTargetRequest(BaseModel):

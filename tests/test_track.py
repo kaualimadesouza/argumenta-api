@@ -235,3 +235,64 @@ def test_track_reports_streak_and_daily_submissions(
 
 def test_track_requires_authentication(client: TestClient, seeded: None) -> None:
     assert client.get("/track").status_code == 401
+
+
+def test_track_points_at_the_chapter_to_open(
+    client: TestClient, seeded: None, second_story: uuid.UUID, db_engine: Engine
+) -> None:
+    """The client cannot navigate without a chapter id, and the CTA counts the
+    chapter's place in the story ("Continuar capitulo 2"), not its row id."""
+    _register(client)
+
+    stories = {story["slug"]: story for story in client.get("/track").json()["stories"]}
+
+    cursor = stories["o-gremio"]["current_chapter"]
+    with Session(db_engine) as session:
+        first = session.scalar(
+            select(Chapter.id)
+            .join(Story, Chapter.story_id == Story.id)
+            .where(Story.position == 1, Chapter.position == 1)
+        )
+    assert cursor == {"id": str(first), "order": 1, "status": "available"}
+    assert stories["segunda-historia"]["current_chapter"] is None
+
+
+def test_the_cursor_walks_to_the_next_unfinished_chapter(
+    client: TestClient, seeded: None, db_engine: Engine
+) -> None:
+    user_id = _register(client)
+    client.get("/track")
+    with Session(db_engine) as session:
+        first = session.scalar(
+            select(Chapter.id)
+            .join(Story, Chapter.story_id == Story.id)
+            .where(Story.position == 1, Chapter.position == 1)
+        )
+        session.merge(
+            ChapterProgress(user_id=user_id, chapter_id=first, status=ChapterStatus.PASSED)
+        )
+        session.commit()
+
+    stories = {story["slug"]: story for story in client.get("/track").json()["stories"]}
+
+    assert stories["o-gremio"]["current_chapter"]["order"] == 2
+
+
+def test_a_finished_story_has_no_chapter_to_open(
+    client: TestClient, seeded: None, second_story: uuid.UUID, db_engine: Engine
+) -> None:
+    user_id = _register(client)
+    client.get("/track")
+    with Session(db_engine) as session:
+        for chapter_id in session.scalars(
+            select(Chapter.id).join(Story, Chapter.story_id == Story.id).where(Story.position == 1)
+        ).all():
+            session.merge(
+                ChapterProgress(user_id=user_id, chapter_id=chapter_id, status=ChapterStatus.PASSED)
+            )
+        session.commit()
+
+    stories = {story["slug"]: story for story in client.get("/track").json()["stories"]}
+
+    assert stories["o-gremio"]["current_chapter"] is None
+    assert stories["segunda-historia"]["current_chapter"]["order"] == 1

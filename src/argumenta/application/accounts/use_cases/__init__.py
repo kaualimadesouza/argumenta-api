@@ -27,6 +27,10 @@ from argumenta.application.accounts.use_cases.set_active_exam_target import (
     SetActiveExamTarget,
     SetActiveExamTargetUseCase,
 )
+from argumenta.application.accounts.use_cases.update_nickname import (
+    UpdateNickname,
+    UpdateNicknameUseCase,
+)
 
 __all__ = [
     "AddExamTarget",
@@ -45,4 +49,6 @@ __all__ = [
     "RemoveExamTargetUseCase",
     "SetActiveExamTarget",
     "SetActiveExamTargetUseCase",
+    "UpdateNickname",
+    "UpdateNicknameUseCase",
 ]

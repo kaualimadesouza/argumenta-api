@@ -36,6 +36,12 @@ Drafts = Annotated[DraftRepository, Depends(get_draft_repository)]
 ProgressW = Annotated[ProgressWriter, Depends(get_progress_writer)]
 
 
+class ChapterCursorResponse(BaseModel):
+    id: uuid.UUID
+    order: int
+    status: ChapterStatus
+
+
 class TrackStoryResponse(BaseModel):
     id: uuid.UUID
     slug: str
@@ -47,6 +53,8 @@ class TrackStoryResponse(BaseModel):
     state: StoryState
     chapters_passed: int
     chapters_total: int
+    current_chapter: ChapterCursorResponse | None
+    """The chapter the CTA opens; null when the story is finished or locked."""
 
 
 class TrackResponse(BaseModel):
@@ -98,7 +106,16 @@ def get_track(
                 cover_asset=item.story.cover_asset,
                 state=item.state,
                 chapters_passed=item.chapters_passed,
-                chapters_total=item.chapters_total,
+                chapters_total=len(item.story.chapter_ids),
+                current_chapter=(
+                    None
+                    if item.current_chapter is None
+                    else ChapterCursorResponse(
+                        id=item.current_chapter.id,
+                        order=item.current_chapter.order,
+                        status=item.current_chapter.status,
+                    )
+                ),
             )
             for item in view.stories
         ],
