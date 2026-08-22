@@ -15,6 +15,7 @@ from argumenta.settings import get_settings
 
 _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EmailAlreadyRegisteredError: 409,
+    errors.AccountNotFoundError: 404,
     errors.InvalidCredentialsError: 401,
     errors.TermsNotAcceptedError: 422,
     errors.GoogleSignInFailedError: 502,

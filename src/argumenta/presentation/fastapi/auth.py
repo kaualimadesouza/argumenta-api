@@ -128,13 +128,14 @@ def login_google(
 def refresh(
     response: Response,
     tokens: Tokens,
+    accounts: Accounts,
     settings: AppSettings,
     refresh_token: Annotated[str | None, Cookie()] = None,
 ) -> None:
     if refresh_token is None:
         raise HTTPException(status_code=401, detail="not authenticated")
     user_id = tokens.verify(refresh_token, kind="refresh")
-    if user_id is None:
+    if user_id is None or not accounts.is_active(user_id):
         raise HTTPException(status_code=401, detail="invalid or expired refresh token")
     _set_auth_cookies(response, tokens.issue_pair(user_id), settings)
 

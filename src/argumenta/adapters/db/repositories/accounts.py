@@ -1,12 +1,18 @@
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
-from argumenta.adapters.db.models import AuthIdentity, User, UserExamTarget
+from argumenta.adapters.db.base import Base
+from argumenta.adapters.db.models import AuthIdentity, PushDevice, User, UserExamTarget
+from argumenta.adapters.db.user_data import DIRECT_USER_TIES, UserFk
 from argumenta.domain.accounts import ExamTarget, UserAccount
 from argumenta.domain.enums import AuthProvider, Exam
+from argumenta.domain.privacy import PurgeReport
 
 
 def _to_user_account(row: User) -> UserAccount:
@@ -64,6 +70,36 @@ class SqlAlchemyAccountRepository:
                 AuthIdentity.deleted_at.is_(None),
             )
         )
+
+    def is_active(self, user_id: uuid.UUID) -> bool:
+        """One indexed lookup per authenticated request: the price of ending a
+        session without a server side session store."""
+        return (
+            self._session.scalar(
+                select(User.id).where(User.id == user_id, User.deleted_at.is_(None))
+            )
+            is not None
+        )
+
+    def soft_delete(self, user_id: uuid.UUID) -> datetime | None:
+        stamped = self._session.execute(
+            update(User)
+            .where(User.id == user_id, User.deleted_at.is_(None))
+            .values(deleted_at=func.now())
+            .returning(User.deleted_at)
+        ).scalar_one_or_none()
+        self._session.flush()
+        return stamped
+
+    def retire_credentials(self, user_id: uuid.UUID) -> None:
+        now = datetime.now(tz=UTC)
+        for model in (AuthIdentity, PushDevice):
+            self._session.execute(
+                update(model)
+                .where(model.user_id == user_id, model.deleted_at.is_(None))
+                .values(deleted_at=now)
+            )
+        self._session.flush()
 
     def find_user_by_google_subject(self, subject: str) -> UserAccount | None:
         row = self._session.scalar(
@@ -163,3 +199,40 @@ class SqlAlchemyExamTargetRepository:
             .values(is_active=True)
         )
         self._session.flush()
+
+
+class SqlAlchemyAccountPurger:
+    """LGPD erasure is a hard delete: the universal soft delete (DER decision 8)
+    is what the purge exists to undo. Dependents leave by cascade, and
+    tests/test_schema_conventions.py holds the schema to that."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def due_for_purge(self, cutoff: datetime, limit: int) -> Sequence[uuid.UUID]:
+        return list(
+            self._session.scalars(
+                select(User.id)
+                .where(User.deleted_at.is_not(None), User.deleted_at <= cutoff)
+                .order_by(User.deleted_at)
+                .limit(limit)
+            )
+        )
+
+    def purge(self, user_id: uuid.UUID) -> PurgeReport:
+        """Counted before the delete, because after it there is nothing to count
+        and an erasure nobody can account for is not much of an erasure."""
+        rows = {tie.table: self._rows_of(tie, user_id) for tie in DIRECT_USER_TIES}
+        erased = cast(
+            CursorResult[Any], self._session.execute(delete(User).where(User.id == user_id))
+        )
+        rows["users"] = erased.rowcount
+        self._session.flush()
+        return PurgeReport(user_id=user_id, rows_by_table=rows)
+
+    def _rows_of(self, tie: UserFk, user_id: uuid.UUID) -> int:
+        table = Base.metadata.tables[tie.table]
+        counted = self._session.scalar(
+            select(func.count()).select_from(table).where(table.c[tie.column] == user_id)
+        )
+        return int(counted or 0)

@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 from argumenta.domain.accounts import ExamTarget, UserAccount
 from argumenta.domain.enums import Exam
+from argumenta.domain.privacy import DeletionReceipt
 
 
 class RegisterRequest(BaseModel):
@@ -59,3 +60,18 @@ class TargetResponse(BaseModel):
 class MeResponse(BaseModel):
     user: UserResponse
     targets: list[TargetResponse]
+
+
+class AccountDeletionResponse(BaseModel):
+    """202, not 204: the account is unusable at `requested_at`, and the rows are
+    gone at `purge_scheduled_for`."""
+
+    requested_at: datetime
+    purge_scheduled_for: datetime
+
+    @classmethod
+    def from_domain(cls, receipt: DeletionReceipt) -> "AccountDeletionResponse":
+        return cls(
+            requested_at=receipt.requested_at,
+            purge_scheduled_for=receipt.purge_scheduled_for,
+        )

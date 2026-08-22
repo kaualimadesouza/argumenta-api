@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     llm_monthly_token_budget: int = 10_000_000
     llm_budget_alert_ratio: float = 0.8
 
+    # LGPD erasure (issue #14): the account dies on request, the rows leave when
+    # the sweep runs, and the window is the only chance to undo a mistake
+    account_purge_grace_days: int = 7
+    account_purge_batch_size: int = 100
+
     # basic login rate limit, per client IP + e-mail
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_seconds: int = 300
