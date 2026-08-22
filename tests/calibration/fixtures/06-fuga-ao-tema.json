@@ -1,0 +1,18 @@
+{
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "slug": "06-fuga-ao-tema",
+  "title": "Texto correto sobre outro assunto",
+  "expected": {
+    "norma_culta": 85,
+    "coesao": 75,
+    "coerencia": 15,
+    "repertorio": 50,
+    "persuasao": 20
+  },
+  "text": "Dona Marta, gostaria de tratar de um assunto que considero urgente na nossa escola: a qualidade da merenda. Nas ultimas semanas, os alunos tem reclamado da repeticao do menu e da falta de opcoes para quem nao come carne. Uma alimentacao equilibrada influencia diretamente o rendimento em sala de aula, como mostram diversos estudos sobre nutricao escolar, e o custo de incluir mais frutas costuma ser menor do que se imagina. Proponho que a escola crie uma comissao com alunos e merendeiras para revisar o menu mensalmente e acompanhar o desperdicio. Tambem seria util instalar bebedouros novos no corredor do segundo andar, ja que os atuais vivem quebrados. Acredito que essas mudancas melhorariam bastante o dia a dia de todos e mostrariam que a direcao escuta os estudantes quando eles apresentam propostas concretas e viaveis para a gestao da escola.",
+  "source": "autoral (Argumenta), nao e redacao oficial"
+}

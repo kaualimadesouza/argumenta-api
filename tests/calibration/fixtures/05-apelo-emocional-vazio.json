@@ -1,0 +1,18 @@
+{
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "slug": "05-apelo-emocional-vazio",
+  "title": "Emocao sem plano nem compromisso",
+  "expected": {
+    "norma_culta": 80,
+    "coesao": 65,
+    "coerencia": 55,
+    "repertorio": 25,
+    "persuasao": 15
+  },
+  "text": "Dona Marta, a senhora nao imagina o quanto esse festival significa para nos. Sao meses de sonho, de conversa no corredor, de esperanca. Muitos alunos passam o ano inteiro esperando esse dia, porque é a unica coisa realmente nossa dentro da escola. Se a senhora cancelar, vai partir o coracao de gente que nao fez nada de errado. Eu vejo meus amigos desanimados, sem vontade de vir para a aula, e tenho certeza de que um pouco de alegria mudaria tudo isso. A senhora sempre foi uma pessoa sensivel, mesmo quando precisa ser dura, e eu acredito de verdade que no fundo a senhora quer o nosso bem. Por favor, deixe o festival acontecer. Prometo, do fundo do coracao, que vamos nos comportar e que nada de ruim vai acontecer desta vez. Confie em nos mais uma vez, a senhora nao vai se arrepender dessa escolha.",
+  "source": "autoral (Argumenta), nao e redacao oficial"
+}

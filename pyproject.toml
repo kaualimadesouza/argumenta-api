@@ -59,6 +59,12 @@ follow_untyped_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# the calibration run costs tokens and needs an API key: opt in with
+# `-m calibration`, never blocking a normal PR (issue #12)
+addopts = "-m 'not calibration'"
+markers = [
+    "calibration: runs the real evaluation engine against the annotated fixtures",
+]
 
 [tool.importlinter]
 root_packages = ["argumenta"]

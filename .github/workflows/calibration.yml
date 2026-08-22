@@ -1,0 +1,42 @@
+name: Calibration
+
+# Manual or nightly, never on pull requests: this job spends LLM tokens and
+# measures engine drift, so it must not gate ordinary changes (issue #12).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+concurrency:
+  group: calibration
+  cancel-in-progress: false
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run the calibration suite
+        env:
+          ARGUMENTA_ANTHROPIC_API_KEY: ${{ secrets.ARGUMENTA_ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ARGUMENTA_ANTHROPIC_API_KEY" ]; then
+            echo "### Calibracao nao executada" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "O secret ARGUMENTA_ANTHROPIC_API_KEY nao esta configurado no repositorio." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          uv run pytest -m calibration -p no:randomly -q

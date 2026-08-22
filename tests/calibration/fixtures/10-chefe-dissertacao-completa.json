@@ -1,0 +1,19 @@
+{
+  "chapter_objective": "Defender, em dissertacao completa, que a escola deve institucionalizar o festival do gremio como politica permanente.",
+  "evaluator_brief": "Dissertacao argumentativa completa: tese explicita, desenvolvimento com repertorio articulado e proposta de intervencao detalhada.",
+  "persona_brief": "A assembleia da escola decide por maioria e cobra viabilidade: quem executa, com que recurso e em que prazo.",
+  "min_words": 250,
+  "max_words": 450,
+  "slug": "10-chefe-dissertacao-completa",
+  "title": "Dissertacao completa com proposta de intervencao detalhada",
+  "expected": {
+    "norma_culta": 90,
+    "coesao": 85,
+    "coerencia": 85,
+    "repertorio": 80,
+    "persuasao": 85,
+    "proposta_intervencao": 90
+  },
+  "text": "A escola publica brasileira convive com uma contradicao conhecida: cobra do estudante protagonismo e, ao mesmo tempo, trata as iniciativas estudantis como excecao a ser tolerada. O festival do gremio expoe esse impasse. Defendo que ele deixe de ser autorizado caso a caso e passe a integrar o calendario da escola como politica permanente, com regras escritas de responsabilidade.\n\nO primeiro argumento é pedagogico. Organizar um evento exige orcamento, divisao de tarefas, negociacao com vizinhos e prestacao de contas, competencias que nenhuma prova de multipla escolha desenvolve. A propria Base Nacional Comum Curricular trata o protagonismo juvenil como competencia geral, e nao como atividade extracurricular opcional. Quando a escola trata o festival como favor, ela ensina, na pratica, que iniciativa depende de permissao pessoal, nao de compromisso assumido.\n\nO segundo argumento é de gestao. A experiencia recente mostra que o problema nunca foi o evento em si, e sim a ausencia de responsavel formal por cada etapa. No ano passado, a quadra ficou suja porque ninguem havia assinado a escala de limpeza; o barulho passou do horario porque nenhum horario havia sido registrado. Onde ha ata, ha responsavel, e onde ha responsavel, ha consequencia.\n\nProponho, portanto, que a assembleia aprove a inclusao do festival no calendario escolar anual, condicionada a um protocolo em tres pontos: o gremio entrega, trinta dias antes, uma ata com nome e assinatura do responsavel por limpeza, som e encerramento; a direcao designa um professor supervisor por turno, com carga contada como atividade complementar; e o descumprimento de qualquer item suspende automaticamente a edicao seguinte. Assim, a escola troca a discussao anual sobre confianca por um combinado verificavel, que protege a direcao e forma quem organiza.",
+  "source": "autoral (Argumenta), nao e redacao oficial"
+}

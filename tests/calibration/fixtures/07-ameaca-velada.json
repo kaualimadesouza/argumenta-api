@@ -1,0 +1,18 @@
+{
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "slug": "07-ameaca-velada",
+  "title": "Coacao no lugar de argumento",
+  "expected": {
+    "norma_culta": 80,
+    "coesao": 70,
+    "coerencia": 60,
+    "repertorio": 30,
+    "persuasao": 10
+  },
+  "text": "Dona Marta, vim avisar que o gremio decidiu que o festival vai acontecer de um jeito ou de outro. Se a autorizacao nao sair, nos vamos levar o caso para a radio da cidade e para os grupos de pais, e a senhora sabe como essas coisas repercutem. Ja temos mais de trezentas assinaturas e um grupo disposto a fazer manifestacao no portao na hora da entrada, com cartazes e com a imprensa avisada. Ninguem aqui quer chegar a esse ponto, mas a senhora precisa entender que a nossa paciencia acabou depois de tanto tempo de silencio da direcao. O mais simples para todos é assinar a liberacao hoje e evitar o desgaste publico, porque a repercussao de uma escola que proibe cultura seria muito ruim justamente no ano da avaliacao externa. Fica a seu criterio, mas pense bem no tamanho do problema que isso pode virar.",
+  "source": "autoral (Argumenta), nao e redacao oficial"
+}

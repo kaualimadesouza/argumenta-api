@@ -1,0 +1,19 @@
+{
+  "chapter_objective": "Defender, em dissertacao completa, que a escola deve institucionalizar o festival do gremio como politica permanente.",
+  "evaluator_brief": "Dissertacao argumentativa completa: tese explicita, desenvolvimento com repertorio articulado e proposta de intervencao detalhada.",
+  "persona_brief": "A assembleia da escola decide por maioria e cobra viabilidade: quem executa, com que recurso e em que prazo.",
+  "min_words": 250,
+  "max_words": 450,
+  "slug": "11-chefe-sem-proposta-de-intervencao",
+  "title": "Dissertacao argumentativa sem proposta de intervencao",
+  "expected": {
+    "norma_culta": 85,
+    "coesao": 80,
+    "coerencia": 70,
+    "repertorio": 70,
+    "persuasao": 60,
+    "proposta_intervencao": 10
+  },
+  "text": "O festival do gremio virou, ano apos ano, um teste de paciencia entre estudantes e direcao. De um lado, alunos que querem um espaco proprio dentro da escola; de outro, uma gestao que responde por barulho, limpeza e seguranca. Defendo que o evento seja reconhecido como parte da vida escolar, e nao como concessao anual.\n\nO primeiro ponto é formativo. A organizacao de um festival mobiliza habilidades que a sala de aula raramente exercita: planejamento, divisao de responsabilidades, negociacao com a vizinhanca e prestacao de contas. Documentos curriculares recentes insistem no protagonismo juvenil como competencia central, o que torna incoerente tratar a principal iniciativa autonoma dos estudantes como um problema de disciplina.\n\nO segundo ponto é de convivencia. Uma escola que abriga a expressao dos seus alunos reduz a distancia entre estudante e instituicao. Quando o unico canal de manifestacao é a reclamacao no corredor, o conflito aumenta; quando existe um espaco reconhecido, a energia se organiza. Isso vale tanto para quem sobe ao palco quanto para quem apenas assiste e passa a enxergar a escola como territorio proprio.\n\nO terceiro ponto é historico. As edicoes anteriores mostram que os problemas apareceram exatamente nos anos em que nao houve combinado escrito, e ficaram menores quando alguem respondeu formalmente por cada etapa. Ou seja, a evidencia disponivel aponta menos para a proibicao e mais para a organizacao.\n\nPor tudo isso, sustento que o festival do gremio merece ser tratado como parte legitima do projeto pedagogico da escola, e que insistir em decidir sua existencia a cada semestre apenas repete um desgaste que ja se mostrou inutil para os dois lados.",
+  "source": "autoral (Argumenta), nao e redacao oficial"
+}

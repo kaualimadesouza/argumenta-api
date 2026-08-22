@@ -1,0 +1,18 @@
+{
+  "chapter_objective": "Convencer Dona Marta, diretora da escola, a liberar o festival do gremio, apresentando um plano concreto de responsabilidade.",
+  "evaluator_brief": "Conta como argumento viavel: plano concreto com responsaveis, horarios e consequencia assumida. Nao conta: apelo emocional vazio, promessa generica, ameaca, bajulacao.",
+  "persona_brief": "Dona Marta e pragmatica e cansada de promessas. Responde a compromisso escrito e a precedente verificavel; desliga na primeira frase de efeito.",
+  "min_words": 120,
+  "max_words": 250,
+  "slug": "09-contradicao-interna",
+  "title": "Tese derrubada pelo proprio texto",
+  "expected": {
+    "norma_culta": 80,
+    "coesao": 60,
+    "coerencia": 20,
+    "repertorio": 45,
+    "persuasao": 25
+  },
+  "text": "Dona Marta, o gremio tem plena condicao de organizar o festival sozinho, sem precisar de nenhum apoio da direcao ou dos professores. Nos somos responsaveis e sabemos exatamente o que fazer em cada etapa do evento. Por outro lado, é verdade que ninguem do gremio tem experiencia com esse tipo de organizacao e que no ano passado a gente acabou deixando a quadra suja porque ninguem sabia quem era o responsavel pela limpeza. Também nao conseguimos definir horario de encerramento, e por isso o barulho passou da meia-noite. Mesmo assim, insisto que nao precisamos de supervisao nenhuma, porque aprendemos com os erros que cometemos, ainda que nao tenhamos feito nenhuma reuniao para discutir esses erros até agora. O festival vai dar certo justamente porque somos os mesmos alunos do ano passado, e a senhora pode confiar totalmente na nossa organizacao, que ainda vamos montar.",
+  "source": "autoral (Argumenta), nao e redacao oficial"
+}
