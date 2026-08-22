@@ -6,6 +6,7 @@ from argumenta.domain import errors
 from argumenta.presentation.fastapi.auth import router as auth_router
 from argumenta.presentation.fastapi.health import router as health_router
 from argumenta.presentation.fastapi.me import router as me_router
+from argumenta.presentation.fastapi.reactions import router as reactions_router
 from argumenta.presentation.fastapi.submissions import router as submissions_router
 from argumenta.presentation.fastapi.track import router as track_router
 
@@ -24,6 +25,7 @@ _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.DailyLimitReachedError: 429,
     errors.LlmBudgetExceededError: 503,
     errors.EvaluationFailedError: 502,
+    errors.SubmissionNotFoundError: 404,
 }
 
 
@@ -34,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(me_router)
     app.include_router(track_router)
     app.include_router(submissions_router)
+    app.include_router(reactions_router)
 
     @app.exception_handler(errors.DomainError)
     async def handle_domain_error(request: Request, exc: errors.DomainError) -> JSONResponse:

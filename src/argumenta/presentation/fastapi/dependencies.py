@@ -18,6 +18,7 @@ from argumenta.adapters.db.repositories.gameplay import (
     SqlAlchemySubmissionRepository,
 )
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
+from argumenta.adapters.db.repositories.reactions import SqlAlchemyReactionRepository
 from argumenta.adapters.db.repositories.track import (
     SqlAlchemyActivityRepository,
     SqlAlchemyContentRepository,
@@ -26,6 +27,7 @@ from argumenta.adapters.db.repositories.track import (
 from argumenta.adapters.db.session import get_session_factory
 from argumenta.adapters.google.oauth import HttpGoogleIdentityGateway
 from argumenta.adapters.llm.claude_engine import ClaudeEvaluationEngine
+from argumenta.adapters.llm.claude_reactions import ClaudeReactionEngine
 from argumenta.adapters.security.argon2_hasher import Argon2PasswordHasher
 from argumenta.adapters.security.jwt_tokens import JwtTokenService
 from argumenta.adapters.security.rate_limiter import SlidingWindowRateLimiter
@@ -34,6 +36,8 @@ from argumenta.application.accounts.ports import GoogleIdentityGateway, RateLimi
 from argumenta.application.evaluation.ports import EvaluationEngine
 from argumenta.application.evaluation.use_cases import EvaluateArgumentUseCase
 from argumenta.application.gameplay.use_cases import SubmitArgumentUseCase
+from argumenta.application.reactions.ports import ReactionEngine
+from argumenta.application.reactions.use_cases import GetCharacterReactionUseCase
 from argumenta.settings import Settings, get_settings
 
 
@@ -176,6 +180,23 @@ def get_evaluate_argument_use_case(
     budget: Annotated[SqlLlmBudget, Depends(get_llm_budget)],
 ) -> EvaluateArgumentUseCase:
     return EvaluateArgumentUseCase(engine, spell_checker, budget)
+
+
+def get_reaction_repository(session: DbSession) -> SqlAlchemyReactionRepository:
+    return SqlAlchemyReactionRepository(session)
+
+
+def get_reaction_engine() -> ReactionEngine:
+    settings = get_settings()
+    return ClaudeReactionEngine(api_key=settings.anthropic_api_key, model=settings.evaluation_model)
+
+
+def get_character_reaction_use_case(
+    reactions: Annotated[SqlAlchemyReactionRepository, Depends(get_reaction_repository)],
+    engine: Annotated[ReactionEngine, Depends(get_reaction_engine)],
+    budget: Annotated[SqlLlmBudget, Depends(get_llm_budget)],
+) -> GetCharacterReactionUseCase:
+    return GetCharacterReactionUseCase(reactions, engine, budget)
 
 
 def get_submit_argument_use_case(
