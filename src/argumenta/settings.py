@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_seconds: int = 300
 
+    # telemetry is the only unbounded write a student has, so it gets its own
+    # window: batches per minute per user, buffered client side
+    telemetry_rate_limit_batches: int = 60
+    telemetry_rate_limit_window_seconds: int = 60
+
+    # hard transport cap, checked before the body is parsed: a 60 MB request
+    # would otherwise cost hundreds of megabytes of RSS to reject
+    max_request_bytes: int = 1_000_000
+
 
 def get_settings() -> Settings:
     return Settings()

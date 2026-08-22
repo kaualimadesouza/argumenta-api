@@ -232,7 +232,23 @@ def get_telemetry_repository(session: DbSession) -> SqlAlchemyTelemetryRepositor
     return SqlAlchemyTelemetryRepository(session)
 
 
+@lru_cache
+def _telemetry_limiter_singleton() -> SlidingWindowRateLimiter:
+    """One window per process, like the login limiter: in memory is enough for
+    a single container beta (the limiter says so itself)."""
+    settings = get_settings()
+    return SlidingWindowRateLimiter(
+        max_attempts=settings.telemetry_rate_limit_batches,
+        window_seconds=settings.telemetry_rate_limit_window_seconds,
+    )
+
+
+def get_telemetry_rate_limiter() -> RateLimiter:
+    return _telemetry_limiter_singleton()
+
+
 def get_record_telemetry_use_case(
     events: Annotated[SqlAlchemyTelemetryRepository, Depends(get_telemetry_repository)],
+    limiter: Annotated[RateLimiter, Depends(get_telemetry_rate_limiter)],
 ) -> RecordTelemetryEventsUseCase:
-    return RecordTelemetryEventsUseCase(events)
+    return RecordTelemetryEventsUseCase(events, limiter)

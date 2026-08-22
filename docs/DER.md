@@ -1,8 +1,16 @@
 # DER: Argumenta
 
-Versão 0.7, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.8, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.8 (issue 13): `telemetry_events.occurred_at`, a hora do evento no
+cliente. `created_at` é a hora do flush do buffer, e ritmo de digitação é série
+temporal: sem a hora do cliente, cinquenta eventos de um lote compartilham um
+único timestamp e os intervalos somem. Nullable, então as linhas anteriores
+seguem significando "hora do cliente desconhecida". O payload passou a ter forma
+tipada por `event_type` (contadores e um slug de tela), o que mantém texto do
+aluno fora do único jsonb do modelo.
 
 Mudanças da v0.7 (implementação das issues 10, 11 e 33):
 `character_reactions.input_tokens` e o único parcial
@@ -397,7 +405,8 @@ erDiagram
     uuid user_id FK
     uuid submission_id FK "opcional"
     text event_type "paste, typing_stats, screen_view"
-    jsonb payload "unico jsonb do modelo"
+    timestamptz occurred_at "hora no cliente, opcional"
+    jsonb payload "unico jsonb do modelo, forma tipada por event_type"
     timestamptz created_at
     timestamptz updated_at
     timestamptz deleted_at
