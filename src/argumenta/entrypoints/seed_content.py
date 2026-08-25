@@ -7,12 +7,14 @@ from collections.abc import Callable
 from sqlalchemy.orm import Session
 
 from argumenta.adapters.db.seed.enem_care import seed_enem_care
+from argumenta.adapters.db.seed.fuvest_traffic import seed_fuvest_traffic
 from argumenta.adapters.db.seed.tutorial import seed_tutorial
 from argumenta.adapters.db.session import session_scope
 
 SEEDS: tuple[tuple[str, Callable[[Session], bool]], ...] = (
     ("tutorial", seed_tutorial),
     ("cuidado-invisivel", seed_enem_care),
+    ("sinal-fechado", seed_fuvest_traffic),
 )
 
 
