@@ -4,8 +4,15 @@ from datetime import datetime
 from typing import Protocol
 
 from argumenta.domain.accounts import ExamTarget, GoogleIdentity, UserAccount
-from argumenta.domain.enums import Exam
+from argumenta.domain.enums import DevicePlatform, Exam
 from argumenta.domain.privacy import PurgeReport
+
+
+class PushDeviceRepository(Protocol):
+    def register(self, user_id: uuid.UUID, platform: DevicePlatform, token: str) -> None: ...
+    def unregister(self, user_id: uuid.UUID, token: str) -> None: ...
+    def unregister_many(self, tokens: Sequence[str]) -> None: ...
+    def get_tokens_for_users(self, user_ids: Sequence[uuid.UUID]) -> Sequence[str]: ...
 
 
 class AccountRepository(Protocol):
