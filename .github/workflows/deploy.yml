@@ -1,0 +1,78 @@
+name: Deploy API
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: deploy-api-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Install UV
+        run: pip install uv
+        
+      - name: Generate requirements.txt for SAM
+        run: uv pip compile pyproject.toml -o requirements.txt
+        
+      - name: Setup AWS SAM
+        uses: aws-actions/setup-sam@v2
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} # pragma: allowlist secret
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # pragma: allowlist secret
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          
+      - name: Build SAM application
+        run: sam build
+        
+      - name: Run Migrations
+        env:
+          ARGUMENTA_DATABASE_URL: ${{ secrets.ARGUMENTA_DATABASE_URL }}
+        run: |
+          uv venv --python=3.12
+          uv sync
+          source .venv/bin/activate
+          alembic upgrade head
+        
+      - name: Deploy SAM application
+        env:
+          ENV_NAME: ${{ github.event.inputs.environment || 'dev' }}
+        run: |
+          sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
+            --stack-name argumenta-api-${ENV_NAME} \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              Stage=${ENV_NAME} \
+              ArgumentaAnthropicApiKey="${{ secrets.ARGUMENTA_ANTHROPIC_API_KEY }}" \
+              ArgumentaGoogleClientId="${{ secrets.ARGUMENTA_GOOGLE_CLIENT_ID }}" \
+              ArgumentaGoogleClientSecret="${{ secrets.ARGUMENTA_GOOGLE_CLIENT_SECRET }}" \
+              ArgumentaDatabaseUrl="${{ secrets.ARGUMENTA_DATABASE_URL }}" \
+              ArgumentaAppSecret="${{ secrets.ARGUMENTA_APP_SECRET }}"
