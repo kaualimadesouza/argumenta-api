@@ -107,6 +107,19 @@ class TestCompare:
 
         assert [drift.dimension for drift in outcome.drifts] == list(_EXPECTED)
 
+    def test_baseline_band_is_tighter_than_gabarito_band(self) -> None:
+        # Score is within BAND (15) of Gabarito, but outside TIGHT_BAND (5) of Baseline
+        # Expected: 80, Baseline: 80, Actual: 70
+        # Drift = -10. Within 15 (yes), within 5 (no) -> DRIFTED
+        actual = _scored(norma_culta=70)
+        baseline = _EXPECTED
+
+        outcome = compare(_fixture(), actual, baseline)
+
+        assert outcome.status == FixtureStatus.DRIFTED
+        assert outcome.worst_drift is not None
+        assert outcome.worst_drift.dimension == Dimension.NORMA_CULTA
+
 
 class TestGate:
     def test_a_uniform_shift_fails_even_with_every_fixture_inside_its_band(self) -> None:

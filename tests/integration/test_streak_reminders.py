@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
+from tests.integration.conftest import REGISTER
 
 from argumenta.adapters.db.models.accounts import PushDevice, User
 from argumenta.adapters.db.models.habit import DailyActivity
@@ -13,7 +14,6 @@ from argumenta.adapters.db.repositories.accounts import SqlAlchemyPushDeviceRepo
 from argumenta.adapters.db.repositories.track import SqlAlchemyActivityRepository
 from argumenta.application.habit.use_cases.remind_streak_at_risk import RemindStreakAtRiskUseCase
 from argumenta.domain.enums import DevicePlatform
-from tests.conftest import REGISTER
 
 
 class FakePushGateway:

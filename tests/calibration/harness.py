@@ -27,6 +27,41 @@ the truth."""
 MEAN_FLOOR = 3
 """Tightest band any mean gets, however many fixtures back it."""
 
+TIGHT_BAND = 5
+"""Measured variance: when a baseline exists, the engine must not drift from it
+by more than this, instead of the 15 points of the authorial gabarito."""
+
+
+def _baseline_path(model: str, prompt_version: str, effort: str | None) -> pathlib.Path:
+    slugs = [model, prompt_version]
+    if effort:
+        slugs.append(effort)
+    return FIXTURES_DIR.parent / "baseline" / f"{'-'.join(slugs)}.json"
+
+
+def load_baseline(
+    model: str, prompt_version: str, effort: str | None
+) -> dict[str, dict[Dimension, int]] | None:
+    path = _baseline_path(model, prompt_version, effort)
+    if not path.exists():
+        return None
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        slug: {Dimension(d): score for d, score in scores.items()} for slug, scores in raw.items()
+    }
+
+
+def save_baseline(
+    model: str, prompt_version: str, effort: str | None, scores: dict[str, dict[Dimension, int]]
+) -> None:
+    path = _baseline_path(model, prompt_version, effort)
+    path.parent.mkdir(exist_ok=True)
+    raw = {
+        slug: {d.value: score for d, score in slug_scores.items()}
+        for slug, slug_scores in scores.items()
+    }
+    path.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
 
 def mean_tolerance_for(sample_count: int) -> int:
     """The band a mean gets, shrinking with the square root of the sample count
@@ -90,6 +125,7 @@ class DimensionDrift:
     dimension: Dimension
     expected: int
     actual: int
+    baseline: int | None = None
     """Only a scored dimension becomes a drift. One the engine skipped is not a
     delta of minus everything, it is a missing measurement."""
 
@@ -98,8 +134,17 @@ class DimensionDrift:
         """Actual minus expected: negative means the engine was harsher."""
         return self.actual - self.expected
 
-    def within(self, band: int = BAND) -> bool:
-        return abs(self.delta) <= band
+    @property
+    def baseline_delta(self) -> int | None:
+        """Actual minus measured baseline, if one exists."""
+        if self.baseline is None:
+            return None
+        return self.actual - self.baseline
+
+    def within(self, band: int = BAND, tight_band: int = TIGHT_BAND) -> bool:
+        if abs(self.delta) > band:
+            return False
+        return self.baseline_delta is None or abs(self.baseline_delta) <= tight_band
 
 
 @dataclass(frozen=True)
@@ -375,13 +420,22 @@ def _parse(path: pathlib.Path) -> CalibrationFixture:
     return CalibrationFixture.model_validate({**raw, "slug": path.stem})
 
 
-def compare(fixture: CalibrationFixture, actual: dict[Dimension, int]) -> FixtureOutcome:
+def compare(
+    fixture: CalibrationFixture,
+    actual: dict[Dimension, int],
+    baseline_expected: dict[Dimension, int] | None = None,
+) -> FixtureOutcome:
     """Scores the engine returned against the reference. A dimension the engine
     skipped is reported as missing, never as a score of zero."""
     return FixtureOutcome(
         fixture=fixture,
         drifts=tuple(
-            DimensionDrift(dimension=dimension, expected=expected, actual=actual[dimension])
+            DimensionDrift(
+                dimension=dimension,
+                expected=expected,
+                actual=actual[dimension],
+                baseline=baseline_expected.get(dimension) if baseline_expected else None,
+            )
             for dimension, expected in fixture.expected.items()
             if dimension in actual
         ),

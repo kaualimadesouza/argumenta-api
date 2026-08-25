@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, event, select
 from sqlalchemy.orm import Session
+from tests.integration.conftest import ScriptedEngine, submit_text
 
 from argumenta.adapters.db.models import Submission, TelemetryEvent
 from argumenta.adapters.security.rate_limiter import SlidingWindowRateLimiter
@@ -25,7 +26,6 @@ from argumenta.domain.telemetry import (
     recordable,
 )
 from argumenta.presentation.fastapi.dependencies import get_telemetry_rate_limiter
-from tests.conftest import ScriptedEngine, submit_text
 
 NOW = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
 NUL = "\u0000"

@@ -10,13 +10,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from tests.integration.conftest import ScriptedEngine
+from tests.integration.conftest import submit_text as _submit
 
 from argumenta.adapters.db.models import Chapter, ChapterProgress, Submission
 from argumenta.domain.enums import ChapterStatus, SubmissionContext
 from argumenta.domain.errors import ChapterNotWritableError
 from argumenta.domain.submission import start_recovery
-from tests.conftest import ScriptedEngine
-from tests.conftest import submit_text as _submit
 
 
 class TestStartRecoveryRule:

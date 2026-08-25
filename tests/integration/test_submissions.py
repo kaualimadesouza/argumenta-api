@@ -7,6 +7,8 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from tests.integration.conftest import ScriptedEngine
+from tests.integration.conftest import submit_text as _submit
 
 from argumenta.adapters.db.models import (
     Chapter,
@@ -17,8 +19,6 @@ from argumenta.adapters.db.models import (
     Submission,
 )
 from argumenta.domain.enums import ChapterStatus
-from tests.conftest import ScriptedEngine
-from tests.conftest import submit_text as _submit
 
 
 class TestStateTransitions:

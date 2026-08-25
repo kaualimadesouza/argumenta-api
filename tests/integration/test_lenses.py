@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from tests.integration.conftest import ScriptedEngine, submit_text
 
 from argumenta.adapters.db.models import Evaluation
 from argumenta.domain.enums import ChapterKind, Dimension, Exam
@@ -22,7 +23,6 @@ from argumenta.domain.lenses import (
     project_lens,
     required_dimensions,
 )
-from tests.conftest import ScriptedEngine, submit_text
 
 BOSS_TEXT = " ".join(["palavra"] * 300)
 

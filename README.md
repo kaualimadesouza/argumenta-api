@@ -100,3 +100,7 @@ com título convencional (validado pelo workflow de título).
 
 Frontend: [argumenta-web](https://github.com/kaualimadesouza/argumenta-web).
 Aplicativo (fase 2): [argumenta-mobile](https://github.com/kaualimadesouza/argumenta-mobile).
+
+## Calibração do Motor
+
+O motor de correção LLM possui uma suíte de calibração em `tests/calibration` para proteger contra regressões e variações. A tolerância contra o gabarito autoral é de 15 pontos por dimensão. A variância do modelo por chamada (ruído de amostragem) foi medida empiricamente (3 corridas sucessivas) em **5 pontos**; esse valor é usado como banda estrita (`TIGHT_BAND`) para proteger contra drift quando uma baseline medida já existe para o prompt atual.
