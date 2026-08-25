@@ -3,16 +3,24 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
-from argumenta.application.accounts.ports import AccountRepository, ExamTargetRepository
+from argumenta.application.accounts.ports import (
+    AccountRepository,
+    ExamTargetRepository,
+    PushDeviceRepository,
+)
 from argumenta.application.accounts.use_cases import (
     AddExamTarget,
     AddExamTargetUseCase,
     DeleteAccountUseCase,
     GetMeUseCase,
+    RegisterPushDevice,
+    RegisterPushDeviceUseCase,
     RemoveExamTarget,
     RemoveExamTargetUseCase,
     SetActiveExamTarget,
     SetActiveExamTargetUseCase,
+    UnregisterPushDevice,
+    UnregisterPushDeviceUseCase,
     UpdateNickname,
     UpdateNicknameUseCase,
 )
@@ -21,12 +29,15 @@ from argumenta.presentation.fastapi.dependencies import (
     CurrentUserId,
     get_account_repository,
     get_exam_target_repository,
+    get_push_device_repository,
 )
 from argumenta.presentation.fastapi.schemas import (
     AccountDeletionResponse,
     AddTargetRequest,
     MeResponse,
+    RegisterPushDeviceRequest,
     TargetResponse,
+    UnregisterPushDeviceRequest,
     UpdateMeRequest,
     UserResponse,
 )
@@ -88,4 +99,25 @@ def remove_target(target_id: uuid.UUID, user_id: CurrentUserId, targets: Targets
 def activate_target(target_id: uuid.UUID, user_id: CurrentUserId, targets: Targets) -> None:
     SetActiveExamTargetUseCase(targets).execute(
         SetActiveExamTarget(user_id=user_id, target_id=target_id)
+    )
+
+
+PushDevices = Annotated[PushDeviceRepository, Depends(get_push_device_repository)]
+
+
+@router.post("/push-devices", status_code=201)
+def register_push_device(
+    body: RegisterPushDeviceRequest, user_id: CurrentUserId, devices: PushDevices
+) -> None:
+    RegisterPushDeviceUseCase(devices).execute(
+        RegisterPushDevice(user_id=user_id, platform=body.platform, token=body.token)
+    )
+
+
+@router.delete("/push-devices", status_code=204)
+def unregister_push_device(
+    body: UnregisterPushDeviceRequest, user_id: CurrentUserId, devices: PushDevices
+) -> None:
+    UnregisterPushDeviceUseCase(devices).execute(
+        UnregisterPushDevice(user_id=user_id, token=body.token)
     )

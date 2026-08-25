@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from argumenta.adapters.db.repositories.accounts import (
     SqlAlchemyAccountRepository,
     SqlAlchemyExamTargetRepository,
+    SqlAlchemyPushDeviceRepository,
 )
 from argumenta.adapters.db.repositories.gameplay import (
     SqlAlchemyDailyActivityWriter,
@@ -69,6 +70,10 @@ def get_account_repository(session: DbSession) -> SqlAlchemyAccountRepository:
 
 def get_exam_target_repository(session: DbSession) -> SqlAlchemyExamTargetRepository:
     return SqlAlchemyExamTargetRepository(session)
+
+
+def get_push_device_repository(session: DbSession) -> SqlAlchemyPushDeviceRepository:
+    return SqlAlchemyPushDeviceRepository(session)
 
 
 def get_password_hasher() -> Argon2PasswordHasher:

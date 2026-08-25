@@ -245,3 +245,55 @@ class SqlAlchemyAccountPurger:
             select(func.count()).select_from(table).where(table.c[tie.column] == user_id)
         )
         return int(counted or 0)
+
+
+class SqlAlchemyPushDeviceRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def register(self, user_id: uuid.UUID, platform: Any, token: str) -> None:
+        from sqlalchemy.dialects.postgresql import insert
+
+        stmt = (
+            insert(PushDevice)
+            .values(user_id=user_id, platform=platform, token=token)
+            .on_conflict_do_update(
+                index_elements=["token"],
+                index_where=PushDevice.deleted_at.is_(None),
+                set_={"user_id": user_id, "platform": platform},
+            )
+        )
+        self._session.execute(stmt)
+        self._session.flush()
+
+    def unregister(self, user_id: uuid.UUID, token: str) -> None:
+        self._session.execute(
+            update(PushDevice)
+            .where(
+                PushDevice.user_id == user_id,
+                PushDevice.token == token,
+                PushDevice.deleted_at.is_(None),
+            )
+            .values(deleted_at=func.now())
+        )
+        self._session.flush()
+
+    def unregister_many(self, tokens: Sequence[str]) -> None:
+        if not tokens:
+            return
+        self._session.execute(
+            update(PushDevice)
+            .where(PushDevice.token.in_(tokens), PushDevice.deleted_at.is_(None))
+            .values(deleted_at=func.now())
+        )
+        self._session.flush()
+
+    def get_tokens_for_users(self, user_ids: Sequence[uuid.UUID]) -> Sequence[str]:
+        if not user_ids:
+            return []
+        rows = self._session.scalars(
+            select(PushDevice.token).where(
+                PushDevice.user_id.in_(user_ids), PushDevice.deleted_at.is_(None)
+            )
+        )
+        return list(rows)

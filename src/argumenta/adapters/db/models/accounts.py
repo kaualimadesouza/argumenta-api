@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, ForeignKey, Index, SmallInteger, Text, false, text
+from sqlalchemy import Boolean, Date, ForeignKey, Index, SmallInteger, Text, false, text
 from sqlalchemy.dialects.postgresql import CITEXT, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,7 @@ class User(UuidPkMixin, AuditMixin, Base):
     terms_accepted_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    last_streak_reminder_at: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class UserExamTarget(UuidPkMixin, AuditMixin, Base):

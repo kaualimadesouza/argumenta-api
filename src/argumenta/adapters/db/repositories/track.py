@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from datetime import date, datetime
 
 from sqlalchemy import select
@@ -153,3 +154,41 @@ class SqlAlchemyActivityRepository:
             .order_by(DailyActivity.activity_date.desc())
         )
         return list(rows)
+
+    def get_users_with_streak_at_risk(self, today: date) -> Sequence[uuid.UUID]:
+        from datetime import timedelta
+
+        from argumenta.adapters.db.models import User
+
+        yesterday = today - timedelta(days=1)
+        practiced_yesterday = select(DailyActivity.user_id).where(
+            DailyActivity.activity_date == yesterday,
+            DailyActivity.submissions_count > 0,
+            DailyActivity.deleted_at.is_(None),
+        )
+        practiced_today = select(DailyActivity.user_id).where(
+            DailyActivity.activity_date == today,
+            DailyActivity.submissions_count > 0,
+            DailyActivity.deleted_at.is_(None),
+        )
+        already_reminded = select(User.id).where(
+            User.last_streak_reminder_at == today,
+            User.deleted_at.is_(None),
+        )
+
+        from sqlalchemy import except_
+
+        query = except_(practiced_yesterday, practiced_today, already_reminded)
+        return list(self._session.scalars(query))
+
+    def mark_streak_reminders_sent(self, user_ids: Sequence[uuid.UUID], today: date) -> None:
+        if not user_ids:
+            return
+        from sqlalchemy import update
+
+        from argumenta.adapters.db.models import User
+
+        self._session.execute(
+            update(User).where(User.id.in_(user_ids)).values(last_streak_reminder_at=today)
+        )
+        self._session.flush()

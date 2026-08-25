@@ -103,6 +103,7 @@ erDiagram
     citext email UK
     text nickname
     timestamptz terms_accepted_at "aceite dos termos no cadastro"
+    date last_streak_reminder_at "evita notificacao duplicada"
     timestamptz created_at
     timestamptz updated_at
     timestamptz deleted_at "soft delete LGPD"

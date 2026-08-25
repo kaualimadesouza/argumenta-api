@@ -5,11 +5,20 @@ from typing import Annotated
 from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
 from argumenta.domain.accounts import ExamTarget, UserAccount
-from argumenta.domain.enums import Exam
+from argumenta.domain.enums import DevicePlatform, Exam
 from argumenta.domain.privacy import DeletionReceipt
 
 Nickname = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
 """Trimmed at the edge: whitespace is not a name, and the column is 40."""
+
+
+class RegisterPushDeviceRequest(BaseModel):
+    platform: DevicePlatform
+    token: str
+
+
+class UnregisterPushDeviceRequest(BaseModel):
+    token: str
 
 
 class RegisterRequest(BaseModel):
