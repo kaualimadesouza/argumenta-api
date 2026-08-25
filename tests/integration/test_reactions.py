@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from tests.integration.conftest import ScriptedEngine, submit_text
 
 from argumenta.adapters.db.models import (
     Chapter,
@@ -36,7 +37,6 @@ from argumenta.presentation.fastapi.dependencies import (
     get_llm_budget,
     get_reaction_engine,
 )
-from tests.conftest import ScriptedEngine, submit_text
 
 
 class ExhaustedBudget:

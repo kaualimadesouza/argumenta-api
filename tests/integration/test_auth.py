@@ -3,11 +3,11 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from tests.integration.conftest import FakeGoogleGateway
 
 from argumenta.adapters.db.models import AuthIdentity, User
 from argumenta.domain.accounts import GoogleIdentity
 from argumenta.domain.enums import AuthProvider
-from tests.conftest import FakeGoogleGateway
 
 REGISTER = {
     "email": "aluno@example.com",

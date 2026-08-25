@@ -14,6 +14,7 @@ from argumenta.adapters.llm.factory import vendor_api_key
 from argumenta.adapters.llm.prompts.evaluation_v1 import PROMPT_VERSION
 from argumenta.adapters.spelling.spylls_checker import SpyllsSpellChecker
 from argumenta.application.evaluation.ports import EngineRequest, EvaluationEngine
+from argumenta.domain.enums import Dimension
 from argumenta.domain.errors import EvaluationFailedError
 from argumenta.domain.evaluation import ensure_graded_exactly
 from argumenta.domain.lenses import GradingSpec, grading_spec
@@ -48,6 +49,12 @@ def test_the_engine_stays_within_tolerance_on_every_fixture(engine: EvaluationEn
     settings = get_settings()
     outcomes: list[FixtureOutcome] = []
     input_tokens = output_tokens = 0
+    _baseline_scores: dict[str, dict[Dimension, int]] = {}
+
+    from tests.calibration.harness import load_baseline
+
+    baseline = load_baseline(settings.evaluation_model, PROMPT_VERSION, settings.evaluation_effort)
+
     try:
         for fixture in load_fixtures():
             spec = grading_spec(fixture.chapter_kind, fixture.exam)
@@ -59,9 +66,14 @@ def test_the_engine_stays_within_tolerance_on_every_fixture(engine: EvaluationEn
                 continue
             input_tokens += result.input_tokens or 0
             output_tokens += result.output_tokens or 0
-            outcomes.append(
-                compare(fixture, {score.dimension: score.score for score in result.scores})
-            )
+
+            actual = {score.dimension: score.score for score in result.scores}
+            baseline_expected = baseline.get(fixture.slug) if baseline else None
+            outcomes.append(compare(fixture, actual, baseline_expected))
+
+            if os.environ.get("ARGUMENTA_CALIBRATION_RECORD"):
+                _baseline_scores[fixture.slug] = actual
+
     finally:
         run = CalibrationResult(
             prompt_version=PROMPT_VERSION,
@@ -72,6 +84,11 @@ def test_the_engine_stays_within_tolerance_on_every_fixture(engine: EvaluationEn
             output_tokens=output_tokens,
         )
         _publish(build_report(run))
+
+        if os.environ.get("ARGUMENTA_CALIBRATION_RECORD") and _baseline_scores:
+            from tests.calibration.harness import save_baseline
+
+            save_baseline(run.model, run.prompt_version, run.effort, _baseline_scores)
 
     verdict = judge(run)
     assert verdict.passed, verdict.summary

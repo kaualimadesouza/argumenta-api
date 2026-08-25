@@ -7,9 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
+from tests.integration.conftest import REGISTER, ScriptedEngine, submit_text
 
 from argumenta.adapters.db.seed.tutorial import seed_tutorial
-from tests.conftest import REGISTER, ScriptedEngine, submit_text
 
 BOSS_TEXT = " ".join(["palavra"] * 300)
 

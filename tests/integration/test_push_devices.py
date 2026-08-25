@@ -4,10 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from tests.integration.conftest import REGISTER
 
 from argumenta.adapters.db.models.accounts import PushDevice, User
 from argumenta.domain.enums import DevicePlatform
-from tests.conftest import REGISTER
 
 
 @pytest.fixture

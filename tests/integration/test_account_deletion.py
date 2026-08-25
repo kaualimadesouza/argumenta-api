@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.orm import Session
+from tests.integration.conftest import REGISTER, FakeGoogleGateway, ScriptedEngine, submit_text
 
 from argumenta.adapters.db.base import Base
 from argumenta.adapters.db.models import (
@@ -26,7 +27,6 @@ from argumenta.application.accounts.use_cases import PurgeDeletedAccountsUseCase
 from argumenta.domain.accounts import GoogleIdentity
 from argumenta.domain.enums import AnnotationType, DevicePlatform, ReactionBeat, Severity
 from argumenta.domain.privacy import PurgeReport, purge_cutoff
-from tests.conftest import REGISTER, FakeGoogleGateway, ScriptedEngine, submit_text
 
 GRACE = timedelta(days=7)
 

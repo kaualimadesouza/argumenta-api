@@ -1,8 +1,7 @@
 """PATCH /me: the nickname the student can actually fix."""
 
 from fastapi.testclient import TestClient
-
-from tests.conftest import REGISTER
+from tests.integration.conftest import REGISTER
 
 
 def _register(client: TestClient) -> None:
