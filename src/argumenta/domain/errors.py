@@ -68,7 +68,3 @@ class SubmissionNotFoundError(DomainError):
 
 class TelemetryBatchTooLargeError(DomainError):
     pass
-
-
-class TelemetryTimestampError(DomainError):
-    pass

@@ -14,7 +14,7 @@ from argumenta.presentation.fastapi.telemetry import router as telemetry_router
 from argumenta.presentation.fastapi.track import router as track_router
 from argumenta.settings import get_settings
 
-_ERROR_STATUS: dict[type[errors.DomainError], int] = {
+ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EmailAlreadyRegisteredError: 409,
     errors.AccountNotFoundError: 404,
     errors.InvalidCredentialsError: 401,
@@ -32,7 +32,6 @@ _ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EvaluationFailedError: 502,
     errors.SubmissionNotFoundError: 404,
     errors.TelemetryBatchTooLargeError: 413,
-    errors.AccountNotFoundError: 404,
 }
 
 
@@ -51,7 +50,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(errors.DomainError)
     async def handle_domain_error(request: Request, exc: errors.DomainError) -> JSONResponse:
-        status_code = _ERROR_STATUS.get(type(exc), 400)
+        status_code = ERROR_STATUS.get(type(exc), 400)
         return JSONResponse(status_code=status_code, content={"detail": type(exc).__name__})
 
     return app

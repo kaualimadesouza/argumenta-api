@@ -24,6 +24,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # python, not curl: the slim image has none. urlopen raises on 503, so a
+      # database the API cannot reach keeps the container unhealthy
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready').read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
 
 volumes:
   pgdata:
