@@ -45,8 +45,10 @@ aws configure --profile argumenta-ai
 
 ## What lives in this account for argumenta-api
 
-- ECR repository `argumenta-api` (with a lifecycle policy, see
-  `infrastructure/ecr-lifecycle-policy.json`)
+- ECR repository `argumenta-api` (lifecycle policy in
+  `infrastructure/ecr-lifecycle-policy.json`; repository policy letting
+  `lambda.amazonaws.com` pull images, in `infrastructure/ecr-lambda-pull-policy.json`,
+  without which `CreateFunction` fails with AccessDeniedException)
 - S3 bucket `argumenta-api-tfstate-743917687224` (Terraform remote state)
 - IAM user `argumenta-api-deployer` + policy `argumenta-api-deployer-policy`
   (scoped to `argumenta-api-*` resources; used only by the GitHub Actions

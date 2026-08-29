@@ -16,8 +16,12 @@ made that rule non-negotiable.
 
 ## Pipeline (`.github/workflows/deploy.yml`)
 
-Triggers: push to `main` deploys **dev**; a published GitHub release (the
-release-please Release PR merging) deploys **prod**; `workflow_dispatch` with an
+Triggers: push to `main` deploys **dev**; merging the release-please Release PR
+deploys **prod**, but NOT via the `release: published` trigger: release-please
+creates the release with `GITHUB_TOKEN`, whose events never start workflows, so
+`release-please.yml` chains this workflow directly (`workflow_call` with
+`environment: prod` when `releases_created` is true). The `release` trigger
+stays only for releases published by hand. `workflow_dispatch` with an
 `environment` input (`dev` | `prod`) picks explicitly. Four jobs, each gated on the previous:
 
 1. **ci** — reuses `ci.yml` (lint, mypy strict, import contracts, bandit, tests).
@@ -40,7 +44,9 @@ Two things must exist before the first deploy, and are deliberately NOT managed
 by Terraform so they survive `terraform destroy`: the ECR repository and the S3
 state bucket. Exact commands are in the README's Deploy section (they change
 rarely enough not to duplicate here) — includes applying
-`ecr-lifecycle-policy.json` and registering the bucket name as the `TF_STATE_BUCKET`
+`ecr-lifecycle-policy.json`, applying `ecr-lambda-pull-policy.json` (the Lambda
+service principal pulls the image itself; without it `CreateFunction` is an
+AccessDeniedException) and registering the bucket name as the `TF_STATE_BUCKET`
 GitHub variable.
 
 ## Secrets and variables (GitHub, repo-level)
