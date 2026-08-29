@@ -14,3 +14,6 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# board dumps from `gh project item-list`, never part of the source
+project_items.json
