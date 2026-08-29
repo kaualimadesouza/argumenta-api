@@ -120,6 +120,10 @@ aws ecr create-repository --repository-name argumenta-api --region us-east-1 \
   --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
 aws ecr put-lifecycle-policy --repository-name argumenta-api --region us-east-1 \
   --lifecycle-policy-text file://infrastructure/ecr-lifecycle-policy.json
+# sem isso o CreateFunction falha com AccessDeniedException: o Lambda puxa a
+# imagem como service principal, nao com as credenciais de quem faz o deploy
+aws ecr set-repository-policy --repository-name argumenta-api --region us-east-1 \
+  --policy-text file://infrastructure/ecr-lambda-pull-policy.json
 
 aws s3api create-bucket --bucket <seu-bucket-tfstate> --region us-east-1
 aws s3api put-bucket-versioning --bucket <seu-bucket-tfstate> \

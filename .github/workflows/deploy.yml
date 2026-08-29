@@ -16,14 +16,21 @@ on:
         options:
           - dev
           - prod
+  # release-please chains this workflow for the prod deploy: its release is
+  # created with GITHUB_TOKEN, whose events never trigger other workflows
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
 
 concurrency:
-  group: deploy-api-${{ github.event.inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
+  group: deploy-api-${{ inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
   cancel-in-progress: false
 
 env:
   ECR_REPOSITORY: argumenta-api
-  ENV_NAME: ${{ github.event.inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
+  ENV_NAME: ${{ inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
 
 jobs:
   ci:

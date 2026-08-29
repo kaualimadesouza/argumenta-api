@@ -1,9 +1,9 @@
 name: release-please
 description: |
   Keeps a release PR open on main, built from conventional commits. Merging the
-  release PR creates the semver tag, the GitHub Release and CHANGELOG.md.
-  Mirrored from the asq-data repo; deploy-on-release jobs arrive with the
-  deploy workflow (issue #3).
+  release PR creates the semver tag, the GitHub Release, CHANGELOG.md and then
+  chains the prod deploy: the release is created with GITHUB_TOKEN, so the
+  `release: published` event never reaches other workflows on its own.
 
 on:
   push:
@@ -27,3 +27,15 @@ jobs:
           release-type: python
           token: ${{ secrets.RP_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: .github/release-please-config.json
+
+  deploy-prod:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    # same group as deploy.yml computes for prod, so the two paths serialize
+    concurrency:
+      group: deploy-api-prod
+      cancel-in-progress: false
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: prod
+    secrets: inherit # pragma: allowlist secret
