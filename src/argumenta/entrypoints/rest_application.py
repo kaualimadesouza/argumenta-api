@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from mangum import Mangum
 
 from argumenta import __version__
 from argumenta.domain import errors
@@ -57,3 +58,5 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+handler = Mangum(app)

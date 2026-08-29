@@ -104,3 +104,24 @@ Aplicativo (fase 2): [argumenta-mobile](https://github.com/kaualimadesouza/argum
 ## Calibração do Motor
 
 O motor de correção LLM possui uma suíte de calibração em `tests/calibration` para proteger contra regressões e variações. A tolerância contra o gabarito autoral é de 15 pontos por dimensão. A variância do modelo por chamada (ruído de amostragem) foi medida empiricamente (3 corridas sucessivas) em **5 pontos**; esse valor é usado como banda estrita (`TIGHT_BAND`) para proteger contra drift quando uma baseline medida já existe para o prompt atual.
+
+## Deploy
+
+O deploy é automatizado no GitHub Actions, utilizando **AWS SAM** para subir a API como uma função **AWS Lambda** junto a um **API Gateway**, num modelo 100% Serverless.
+
+O banco de dados de produção fica hospedado gratuitamente no **Neon** (Serverless Postgres), aproveitando o connection pooling nativo (`pooler.neon.tech`), o que é fundamental para a compatibilidade com a natureza altamente paralela do Lambda.
+
+**Secrets necessários no ambiente do GitHub:**
+- `AWS_ACCESS_KEY_ID`: Credencial da AWS com permissão para o deploy do SAM (CloudFormation, S3, IAM, Lambda, API Gateway).
+- `AWS_SECRET_ACCESS_KEY`: Chave secreta da AWS.
+- `ARGUMENTA_ANTHROPIC_API_KEY`: Chave do Claude.
+- `ARGUMENTA_GOOGLE_CLIENT_ID`: OAuth do Google.
+- `ARGUMENTA_GOOGLE_CLIENT_SECRET`: OAuth do Google.
+- `ARGUMENTA_DATABASE_URL`: URL do Neon (com pooler) no formato `postgresql://user:pass@ep-...pooler.neon.tech/db`. <!-- pragma: allowlist secret -->
+- `ARGUMENTA_APP_SECRET`: Chave secreta da aplicação para assinar os tokens JWT.
+
+**Como acionar:**
+```bash
+gh workflow run deploy.yml -f environment=dev   # manual deploy (dev/prod)
+```
+O deploy também ocorre a cada `push` na `main`.
