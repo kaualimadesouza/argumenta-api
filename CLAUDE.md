@@ -13,6 +13,7 @@ first; do not improvise the workflow from memory.
 | If the task involves... | Invoke |
 |---|---|
 | Schema, SQLAlchemy models, Alembic, anything database | `db-migrations` |
+| Any direct AWS action (CLI/console): IAM, ECR, S3, SSM, Lambda, Terraform backend | `aws` |
 | Deploying, GitHub Actions deploy workflows, VPS, GHCR, rollback | `deploy` |
 | Starting/finishing an issue, opening a PR, the kanban board | `card-workflow` |
 | Adding features, endpoints, use cases, repositories, new modules | `hexagonal-structure` |
