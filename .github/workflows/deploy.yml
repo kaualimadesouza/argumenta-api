@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       environment:
@@ -15,12 +18,12 @@ on:
           - prod
 
 concurrency:
-  group: deploy-api-${{ github.event.inputs.environment || 'dev' }}
+  group: deploy-api-${{ github.event.inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
   cancel-in-progress: false
 
 env:
   ECR_REPOSITORY: argumenta-api
-  ENV_NAME: ${{ github.event.inputs.environment || 'dev' }}
+  ENV_NAME: ${{ github.event.inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
 
 jobs:
   ci:
@@ -143,9 +146,9 @@ jobs:
             ICON="❌"
             STATUS_TEXT="falhou no deploy"
           fi
-          MESSAGE="${ICON} Deploy do argumenta-api (${ENV_NAME}) ${STATUS_TEXT}
-commit: ${GITHUB_SHA}
-run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          MESSAGE=$(printf '%s Deploy do argumenta-api (%s) %s\ncommit: %s\nrun: %s/%s/actions/runs/%s' \
+            "$ICON" "$ENV_NAME" "$STATUS_TEXT" "$GITHUB_SHA" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${MESSAGE}"

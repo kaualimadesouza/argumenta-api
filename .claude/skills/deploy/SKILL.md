@@ -16,8 +16,9 @@ made that rule non-negotiable.
 
 ## Pipeline (`.github/workflows/deploy.yml`)
 
-Triggers: push to `main`, or `workflow_dispatch` with an `environment` input
-(`dev` | `prod`). Four jobs, each gated on the previous:
+Triggers: push to `main` deploys **dev**; a published GitHub release (the
+release-please Release PR merging) deploys **prod**; `workflow_dispatch` with an
+`environment` input (`dev` | `prod`) picks explicitly. Four jobs, each gated on the previous:
 
 1. **ci** — reuses `ci.yml` (lint, mypy strict, import contracts, bandit, tests).
 2. **build-and-push** — logs into ECR, `docker buildx build --platform linux/amd64 --provenance=false --push`, tags the image with `github.sha`, outputs the full image URI.
