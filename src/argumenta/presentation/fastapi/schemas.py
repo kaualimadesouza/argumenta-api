@@ -52,6 +52,10 @@ class UserResponse(BaseModel):
     email: str
     nickname: str
     terms_accepted_at: datetime | None
+    """Set only for a mobile client (`X-Argumenta-Client: mobile`): a browser
+    relies on the httpOnly cookies instead, which stay invisible to its JS."""
+    access_token: str | None = None
+    refresh_token: str | None = None
 
     @classmethod
     def from_domain(cls, user: UserAccount) -> "UserResponse":
@@ -61,6 +65,14 @@ class UserResponse(BaseModel):
             nickname=user.nickname,
             terms_accepted_at=user.terms_accepted_at,
         )
+
+
+class RefreshResponse(BaseModel):
+    """Body for a mobile refresh (200): a browser gets 204 with no body, since
+    its refresh token lives in a cookie it never needed back."""
+
+    access_token: str
+    refresh_token: str
 
 
 class TargetResponse(BaseModel):

@@ -17,9 +17,11 @@ REGISTER = {
 }
 
 
-def _register(client: TestClient, **overrides: object) -> dict[str, object]:
+def _register(
+    client: TestClient, headers: dict[str, str] | None = None, **overrides: object
+) -> dict[str, object]:
     body = {**REGISTER, **overrides}
-    response = client.post("/auth/register", json=body)
+    response = client.post("/auth/register", json=body, headers=headers)
     assert response.status_code == 201, response.text
     return dict(response.json())
 
@@ -185,3 +187,85 @@ def test_refresh_renews_the_session(client: TestClient) -> None:
 
 def test_refresh_without_cookie_fails(client: TestClient) -> None:
     assert client.post("/auth/refresh").status_code == 401
+
+
+MOBILE = {"X-Argumenta-Client": "mobile"}
+
+
+def test_register_with_mobile_header_returns_tokens_in_body(client: TestClient) -> None:
+    body = _register(client, headers=MOBILE)
+
+    assert body["access_token"]
+    assert body["refresh_token"]
+
+
+def test_register_without_mobile_header_has_no_tokens_in_body(client: TestClient) -> None:
+    body = _register(client)
+
+    assert body.get("access_token") is None
+    assert body.get("refresh_token") is None
+
+
+def test_login_with_mobile_header_returns_tokens_in_body(client: TestClient) -> None:
+    _register(client)
+    client.post("/auth/logout")
+
+    response = client.post(
+        "/auth/login",
+        json={"email": REGISTER["email"], "password": REGISTER["password"]},
+        headers=MOBILE,
+    )
+
+    body = response.json()
+    assert body["access_token"]
+    assert body["refresh_token"]
+
+
+def test_google_login_with_mobile_header_returns_tokens_in_body(
+    client: TestClient, google_gateway: FakeGoogleGateway
+) -> None:
+    google_gateway.identity = GoogleIdentity(
+        subject="google-sub-mobile", email="mobile@example.com", email_verified=True
+    )
+
+    response = client.post(
+        "/auth/google",
+        json={"code": "any", "redirect_uri": "http://localhost/cb"},
+        headers=MOBILE,
+    )
+
+    body = response.json()
+    assert body["access_token"]
+    assert body["refresh_token"]
+
+
+def test_bearer_token_authenticates_with_no_cookie_at_all(client: TestClient) -> None:
+    body = _register(client, headers=MOBILE)
+    client.cookies.clear()
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {body['access_token']}"})
+
+    assert response.status_code == 200
+
+
+def test_refresh_with_bearer_and_no_cookie_returns_tokens_in_body(client: TestClient) -> None:
+    body = _register(client, headers=MOBILE)
+    client.cookies.clear()
+
+    response = client.post(
+        "/auth/refresh", headers={"Authorization": f"Bearer {body['refresh_token']}"}
+    )
+
+    assert response.status_code == 200
+    refreshed = response.json()
+    assert refreshed["access_token"]
+    assert refreshed["refresh_token"]
+
+
+def test_refresh_with_cookie_still_returns_204_with_no_body(client: TestClient) -> None:
+    _register(client)
+
+    response = client.post("/auth/refresh")
+
+    assert response.status_code == 204
+    assert response.content == b""
