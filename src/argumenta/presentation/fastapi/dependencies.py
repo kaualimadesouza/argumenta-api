@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException
+from fastapi import Cookie, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from argumenta.adapters.db.repositories.accounts import (
@@ -117,16 +117,36 @@ def get_google_gateway() -> GoogleIdentityGateway:
     )
 
 
+def bearer_token(authorization: Annotated[str | None, Header()] = None) -> str | None:
+    """A mobile client has no cookie jar to trust (React Native's own docs call
+    cookie auth unstable), so it sends the token itself instead."""
+    if authorization is None or not authorization.startswith("Bearer "):
+        return None
+    return authorization.removeprefix("Bearer ")
+
+
+BearerToken = Annotated[str | None, Depends(bearer_token)]
+
+
+def is_mobile_client(x_argumenta_client: Annotated[str | None, Header()] = None) -> bool:
+    return x_argumenta_client == "mobile"
+
+
+IsMobileClient = Annotated[bool, Depends(is_mobile_client)]
+
+
 def get_current_user_id(
     token_service: Annotated[JwtTokenService, Depends(get_token_service)],
     accounts: Annotated[SqlAlchemyAccountRepository, Depends(get_account_repository)],
+    bearer: BearerToken,
     access_token: Annotated[str | None, Cookie()] = None,
 ) -> uuid.UUID:
     """The account lookup is what ends a session: the token is stateless, so
     after `DELETE /me` only the database knows it is worthless."""
-    if access_token is None:
+    token = access_token or bearer
+    if token is None:
         raise HTTPException(status_code=401, detail="not authenticated")
-    user_id = token_service.verify(access_token, kind="access")
+    user_id = token_service.verify(token, kind="access")
     if user_id is None:
         raise HTTPException(status_code=401, detail="invalid or expired token")
     if not accounts.is_active(user_id):

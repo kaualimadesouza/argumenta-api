@@ -17,8 +17,11 @@ from argumenta.application.accounts.use_cases import (
     RegisterWithEmailUseCase,
 )
 from argumenta.application.ports import RateLimiter
+from argumenta.domain.accounts import UserAccount
 from argumenta.presentation.fastapi.dependencies import (
     AppSettings,
+    BearerToken,
+    IsMobileClient,
     get_account_repository,
     get_google_gateway,
     get_password_hasher,
@@ -28,6 +31,7 @@ from argumenta.presentation.fastapi.dependencies import (
 from argumenta.presentation.fastapi.schemas import (
     GoogleLoginRequest,
     LoginRequest,
+    RefreshResponse,
     RegisterRequest,
     UserResponse,
 )
@@ -68,6 +72,24 @@ def _client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _finish_auth(
+    response: Response,
+    user: UserAccount,
+    tokens: JwtTokenService,
+    settings: Settings,
+    mobile: bool,
+) -> UserResponse:
+    """Cookies are set either way, so a web session keeps working even if a
+    client wrongly sends the mobile header; only the body changes."""
+    pair = tokens.issue_pair(user.id)
+    _set_auth_cookies(response, pair, settings)
+    body = UserResponse.from_domain(user)
+    if mobile:
+        body.access_token = pair.access_token
+        body.refresh_token = pair.refresh_token
+    return body
+
+
 @router.post("/register", status_code=201)
 def register(
     body: RegisterRequest,
@@ -76,6 +98,7 @@ def register(
     hasher: Hasher,
     tokens: Tokens,
     settings: AppSettings,
+    mobile: IsMobileClient,
 ) -> UserResponse:
     use_case = RegisterWithEmailUseCase(accounts, hasher)
     user = use_case.execute(
@@ -86,8 +109,7 @@ def register(
             accepted_terms=body.accepted_terms,
         )
     )
-    _set_auth_cookies(response, tokens.issue_pair(user.id), settings)
-    return UserResponse.from_domain(user)
+    return _finish_auth(response, user, tokens, settings, mobile)
 
 
 @router.post("/login")
@@ -100,13 +122,13 @@ def login(
     limiter: Limiter,
     tokens: Tokens,
     settings: AppSettings,
+    mobile: IsMobileClient,
 ) -> UserResponse:
     use_case = LoginWithEmailUseCase(accounts, hasher, limiter)
     user = use_case.execute(
         LoginWithEmail(email=body.email, password=body.password, client_key=_client_key(request))
     )
-    _set_auth_cookies(response, tokens.issue_pair(user.id), settings)
-    return UserResponse.from_domain(user)
+    return _finish_auth(response, user, tokens, settings, mobile)
 
 
 @router.post("/google")
@@ -117,27 +139,38 @@ def login_google(
     google: Google,
     tokens: Tokens,
     settings: AppSettings,
+    mobile: IsMobileClient,
 ) -> UserResponse:
     use_case = LoginWithGoogleUseCase(accounts, google)
     user = use_case.execute(LoginWithGoogle(code=body.code, redirect_uri=body.redirect_uri))
-    _set_auth_cookies(response, tokens.issue_pair(user.id), settings)
-    return UserResponse.from_domain(user)
+    return _finish_auth(response, user, tokens, settings, mobile)
 
 
-@router.post("/refresh", status_code=204)
+@router.post("/refresh")
 def refresh(
     response: Response,
     tokens: Tokens,
     accounts: Accounts,
     settings: AppSettings,
+    bearer: BearerToken,
     refresh_token: Annotated[str | None, Cookie()] = None,
-) -> None:
-    if refresh_token is None:
+) -> RefreshResponse | None:
+    """A web session's refresh token lives only in its httpOnly cookie, so a
+    204 with no body is all it needs; a mobile client has no cookie to renew,
+    so it hands its refresh token back via `Authorization` and gets a new pair
+    in the body instead."""
+    token = refresh_token or bearer
+    if token is None:
         raise HTTPException(status_code=401, detail="not authenticated")
-    user_id = tokens.verify(refresh_token, kind="refresh")
+    user_id = tokens.verify(token, kind="refresh")
     if user_id is None or not accounts.is_active(user_id):
         raise HTTPException(status_code=401, detail="invalid or expired refresh token")
-    _set_auth_cookies(response, tokens.issue_pair(user_id), settings)
+    pair = tokens.issue_pair(user_id)
+    _set_auth_cookies(response, pair, settings)
+    if refresh_token is not None:
+        response.status_code = 204
+        return None
+    return RefreshResponse(access_token=pair.access_token, refresh_token=pair.refresh_token)
 
 
 @router.post("/logout", status_code=204)
