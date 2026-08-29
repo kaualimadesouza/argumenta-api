@@ -71,6 +71,9 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    # the job-level environment key cannot read the env context, hence the
+    # repeated expression; it selects which ARGUMENTA_DATABASE_URL* it gets
+    environment: ${{ inputs.environment || (github.event_name == 'release' && 'prod') || 'dev' }}
     steps:
       - uses: actions/checkout@v4
 

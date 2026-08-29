@@ -54,7 +54,11 @@ GitHub variable.
 Secrets (sensitive): `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (the
 `argumenta-api-deployer` IAM user, never the account admin — see `aws` skill),
 `ARGUMENTA_DATABASE_URL` (pooled) / `ARGUMENTA_DATABASE_URL_DIRECT` (direct, for
-migrations only — see `neon-postgres` skill for why), `ARGUMENTA_JWT_SECRET`,
+migrations only — see `neon-postgres` skill for why) — these two are
+**environment-scoped** (GitHub Environments `dev`/`prod`, selected by the deploy
+job's `environment:` key): dev points at the Neon branch `dev`, prod at the
+`production` branch, so each deploy migrates and serves its own database.
+Everything below is repo-level. `ARGUMENTA_JWT_SECRET`,
 `ARGUMENTA_ANTHROPIC_API_KEY`, `ARGUMENTA_GOOGLE_API_KEY` (Gemini, not the same
 thing as the OAuth pair below), `ARGUMENTA_GOOGLE_CLIENT_ID`/`_SECRET` (Google
 login OAuth), `TELEGRAM_BOT_TOKEN`/`_CHAT_ID`.

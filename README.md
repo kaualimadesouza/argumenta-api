@@ -149,8 +149,8 @@ O usuário IAM usado pelo pipeline (`argumenta-api-deployer`) não é o admin da
 - `ARGUMENTA_GOOGLE_API_KEY`: Chave do Gemini (Google AI Studio). Necessária se `ARGUMENTA_LLM_VENDOR` for `google`. Não confundir com o OAuth abaixo, são credenciais diferentes.
 - `ARGUMENTA_GOOGLE_CLIENT_ID`: OAuth do Google (login).
 - `ARGUMENTA_GOOGLE_CLIENT_SECRET`: OAuth do Google (login).
-- `ARGUMENTA_DATABASE_URL`: URL do Neon **com pooler**, formato `postgresql+psycopg://user:pass@ep-...-pooler.neon.tech/db`. Usada em runtime pela função Lambda. <!-- pragma: allowlist secret -->
-- `ARGUMENTA_DATABASE_URL_DIRECT`: URL do Neon **sem pooler** (mesmo host, sem o sufixo `-pooler`), mesmo formato acima. Usada só para rodar as migrations do Alembic: o pooler do Neon roda em modo transaction do pgbouncer, que não sustenta o estado de sessão que o Alembic depende. <!-- pragma: allowlist secret -->
+- `ARGUMENTA_DATABASE_URL`: URL do Neon **com pooler**, formato `postgresql+psycopg://user:pass@ep-...-pooler.neon.tech/db`. Usada em runtime pela função Lambda. **Secret de environment** (`dev`/`prod`, não de repositório): cada ambiente aponta para seu branch do Neon (`dev` → branch `dev`, `prod` → branch `production`), então dev e prod têm bancos isolados. <!-- pragma: allowlist secret -->
+- `ARGUMENTA_DATABASE_URL_DIRECT`: URL do Neon **sem pooler** (mesmo host, sem o sufixo `-pooler`), mesmo formato acima. Também secret de environment. Usada só para rodar as migrations do Alembic: o pooler do Neon roda em modo transaction do pgbouncer, que não sustenta o estado de sessão que o Alembic depende. Como cada deploy migra o banco do próprio ambiente, uma migration testada em dev não encosta em prod até a release. <!-- pragma: allowlist secret -->
 - `ARGUMENTA_JWT_SECRET`: Chave secreta da aplicação para assinar os tokens JWT (32+ bytes).
 - `TELEGRAM_BOT_TOKEN`: token do bot criado com o [@BotFather](https://t.me/BotFather), usado pelo estágio de notificação.
 - `TELEGRAM_CHAT_ID`: id do chat (pessoal) pra onde a notificação de sucesso/falha do deploy é enviada.
