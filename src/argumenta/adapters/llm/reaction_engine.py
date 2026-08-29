@@ -13,15 +13,15 @@ from argumenta.domain.enums import Verdict
 
 
 class LlmReactionEngine:
-    """Free text: the reaction is performance, not judgement. Low effort and a
-    budget with room to spare, because thinking comes out of the token budget and
-    a truncated reaction is an empty one."""
+    """Free text: the reaction is performance, not judgement. No effort knob by
+    default (Haiku 4.5 rejects one) and a budget with room to spare, because
+    thinking comes out of the token budget and a truncated reaction is an empty one."""
 
     def __init__(
         self,
         provider: LlmProvider,
         max_tokens: int = 1500,
-        effort: Effort | None = "low",
+        effort: Effort | None = None,
     ) -> None:
         self._provider = provider
         self._max_tokens = max_tokens

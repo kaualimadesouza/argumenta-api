@@ -49,3 +49,23 @@ def inlined_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
     resolved: dict[str, Any] = resolve(deepcopy(schema))
     return resolved
+
+
+_STRICT_UNSUPPORTED = ("minimum", "maximum", "multipleOf", "minLength", "maxLength", "pattern")
+
+
+def anthropic_strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Anthropic strict mode rejects these constraint keywords, so they move into
+    the description (the docs' own recipe) and pydantic keeps enforcing them when
+    the payload is validated app side."""
+
+    def fold(node: dict[str, Any]) -> dict[str, Any]:
+        dropped = {key: node[key] for key in _STRICT_UNSUPPORTED if key in node}
+        if not dropped:
+            return node
+        note = ", ".join(f"{key} {value}" for key, value in dropped.items())
+        rest = {key: value for key, value in node.items() if key not in dropped}
+        description = f"{rest.get('description', '')} ({note})".strip()
+        return {**rest, "description": description}
+
+    return strict_schema(_walk(deepcopy(schema), fold))

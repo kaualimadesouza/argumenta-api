@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from mangum import Mangum
@@ -14,6 +16,8 @@ from argumenta.presentation.fastapi.submissions import router as submissions_rou
 from argumenta.presentation.fastapi.telemetry import router as telemetry_router
 from argumenta.presentation.fastapi.track import router as track_router
 from argumenta.settings import get_settings
+
+_logger = logging.getLogger(__name__)
 
 ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EmailAlreadyRegisteredError: 409,
@@ -52,6 +56,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(errors.DomainError)
     async def handle_domain_error(request: Request, exc: errors.DomainError) -> JSONResponse:
         status_code = ERROR_STATUS.get(type(exc), 400)
+        if status_code >= 500:
+            # the response hides the message from the student on purpose; the
+            # log is the only place the real cause survives
+            _logger.error("%s: %s", type(exc).__name__, exc)
         return JSONResponse(status_code=status_code, content={"detail": type(exc).__name__})
 
     return app
