@@ -114,7 +114,7 @@ def _evaluation(timeout: float = 90.0) -> LlmEvaluationEngine:
 
 def _reaction(timeout: float = 30.0) -> LlmReactionEngine:
     return LlmReactionEngine(
-        AnthropicProvider(api_key="k", model="claude-sonnet-5", timeout=timeout)
+        AnthropicProvider(api_key="k", model="claude-haiku-4-5", timeout=timeout)
     )
 
 
@@ -151,6 +151,35 @@ class TestEvaluationRequestContract:
         _evaluation().evaluate(_engine_request())
 
         assert not {"temperature", "top_p", "top_k"} & set(client.messages.kwargs)
+
+    def test_the_schema_goes_out_strict(self, fake_client: Any) -> None:
+        """Caught live: Sonnet returned an annotation without `severity`, pydantic
+        rejected it and the student saw a 502. Strict tool use makes the API
+        enforce the schema during generation instead."""
+        client = fake_client(_tool_response())
+
+        _evaluation().evaluate(_engine_request())
+
+        tool = client.messages.kwargs["tools"][0]
+        assert tool["strict"] is True
+
+        banned = {"minimum", "maximum", "multipleOf", "minLength", "maxLength", "pattern"}
+
+        def assert_tight(node: Any) -> None:
+            if isinstance(node, dict):
+                assert not banned & set(node)
+                if node.get("type") == "object" and "properties" in node:
+                    assert node["additionalProperties"] is False
+                    assert node["required"] == list(node["properties"])
+                for value in node.values():
+                    assert_tight(value)
+            elif isinstance(node, list):
+                for item in node:
+                    assert_tight(item)
+
+        assert_tight(tool["input_schema"])
+        score = tool["input_schema"]["$defs"]["ScoreOutput"]["properties"]["score"]
+        assert "0" in score["description"] and "100" in score["description"]
 
     def test_effort_is_explicit_and_defaults_to_the_api_default(self, fake_client: Any) -> None:
         """Effort moves every score, so it is never implicit here; `high` is
@@ -239,14 +268,15 @@ class TestReactionRequestContract:
 
         assert not {"temperature", "top_p", "top_k"} & set(client.messages.kwargs)
 
-    def test_the_flavour_beat_thinks_as_little_as_possible(self, fake_client: Any) -> None:
-        """A reaction is performance, not judgement: low effort, and a budget
-        with room to spare because a truncated reaction is an empty one."""
+    def test_the_flavour_beat_does_not_ask_for_thinking(self, fake_client: Any) -> None:
+        """A reaction is performance, not judgement: no effort knob (Haiku 4.5
+        rejects one), and a budget with room to spare because a truncated
+        reaction is an empty one."""
         client = fake_client(_text_response())
 
         _reaction().generate(_reaction_request())
 
-        assert client.messages.kwargs["output_config"] == {"effort": "low"}
+        assert client.messages.kwargs["output_config"] is anthropic.omit
         assert client.messages.kwargs["max_tokens"] >= 1500
 
     def test_the_line_comes_back_stripped_with_its_cost(self, fake_client: Any) -> None:
@@ -264,6 +294,20 @@ class TestReactionRequestContract:
 
         with pytest.raises(EvaluationFailedError, match="max_tokens"):
             _reaction().generate(_reaction_request())
+
+    def test_the_default_reaction_is_haiku_without_the_effort_knob(self, fake_client: Any) -> None:
+        """The flavour beat runs on the cheap model, and Haiku 4.5 has no
+        effort knob (a non-omitted output_config is a 400), so the default
+        wiring must leave it out entirely."""
+        client = fake_client(_text_response())
+        get_reaction_engine.cache_clear()
+        try:
+            get_reaction_engine().generate(_reaction_request())
+        finally:
+            get_reaction_engine.cache_clear()
+
+        assert client.messages.kwargs["model"] == "claude-haiku-4-5"
+        assert client.messages.kwargs["output_config"] is anthropic.omit
 
 
 class TestUsableResponses:

@@ -41,9 +41,10 @@ class Settings(BaseSettings):
     # 2 retries) would pin a pool connection for up to half an hour
     evaluation_timeout_seconds: float = 90.0
     # character reaction (issue #10): free text, own knob so the flavour beat can
-    # move to a cheaper model without touching the graded correction
-    reaction_model: str = "claude-sonnet-5"
-    reaction_effort: Effort | None = "low"
+    # move to a cheaper model without touching the graded correction. Haiku 4.5
+    # has no effort knob (a non-omitted output_config is a 400), hence None
+    reaction_model: str = "claude-haiku-4-5"
+    reaction_effort: Effort | None = None
     reaction_timeout_seconds: float = 30.0
     # monthly LLM cap in tokens over evaluations + character_reactions; 0 disables
     llm_monthly_token_budget: int = 10_000_000

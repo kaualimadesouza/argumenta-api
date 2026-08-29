@@ -104,9 +104,19 @@ class TestEngineOutputContract:
         with pytest.raises(EvaluationFailedError):
             parse_engine_output({**self.PAYLOAD, "scores": bad}, "texto")
 
-    def test_span_outside_text_is_rejected(self) -> None:
-        with pytest.raises(EvaluationFailedError):
-            parse_engine_output(self.PAYLOAD, "abc")
+    def test_an_out_of_bounds_span_is_dropped_not_fatal(self) -> None:
+        """Caught live: one hallucinated span (LLM offsets are unreliable) was
+        throwing away the whole paid correction. A highlight that points outside
+        the text is useless; the scores and the other annotations are not."""
+        output = parse_engine_output(self.PAYLOAD, "abc")
+        assert output.annotations == []
+        assert len(output.scores) == 5
+
+    def test_valid_annotations_survive_the_dropped_one(self) -> None:
+        bad = {**self.PAYLOAD["annotations"][0], "span_start": 10, "span_end": 99}
+        payload = {**self.PAYLOAD, "annotations": [self.PAYLOAD["annotations"][0], bad]}
+        output = parse_engine_output(payload, "algo escrito pelo aluno")
+        assert [a.span_end for a in output.annotations] == [4]
 
     def test_empty_evidence_is_rejected(self) -> None:
         bad = [{**s, "evidence": ""} for s in self.PAYLOAD["scores"]]

@@ -55,7 +55,7 @@ variable "argumenta_evaluation_model" {
 variable "argumenta_reaction_model" {
   description = "Model name for the character reaction; must match argumenta_llm_vendor unless reaction_llm_vendor overrides it"
   type        = string
-  default     = "claude-sonnet-5"
+  default     = "claude-haiku-4-5"
 }
 
 variable "argumenta_jwt_secret" {
