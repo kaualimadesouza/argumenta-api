@@ -117,7 +117,8 @@ O banco de dados de produção fica hospedado gratuitamente no **Neon** (Serverl
 - `ARGUMENTA_ANTHROPIC_API_KEY`: Chave do Claude.
 - `ARGUMENTA_GOOGLE_CLIENT_ID`: OAuth do Google.
 - `ARGUMENTA_GOOGLE_CLIENT_SECRET`: OAuth do Google.
-- `ARGUMENTA_DATABASE_URL`: URL do Neon (com pooler) no formato `postgresql://user:pass@ep-...pooler.neon.tech/db`. <!-- pragma: allowlist secret -->
+- `ARGUMENTA_DATABASE_URL`: URL do Neon **com pooler**, formato `postgresql+psycopg://user:pass@ep-...-pooler.neon.tech/db`. Usada em runtime pela função Lambda. <!-- pragma: allowlist secret -->
+- `ARGUMENTA_DATABASE_URL_DIRECT`: URL do Neon **sem pooler** (mesmo host, sem o sufixo `-pooler`), mesmo formato acima. Usada só para rodar as migrations do Alembic: o pooler do Neon roda em modo transaction do pgbouncer, que não sustenta o estado de sessão que o Alembic depende. <!-- pragma: allowlist secret -->
 - `ARGUMENTA_APP_SECRET`: Chave secreta da aplicação para assinar os tokens JWT.
 
 **Como acionar:**

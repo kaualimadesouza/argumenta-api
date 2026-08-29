@@ -11,6 +11,8 @@ htmlcov/
 .env.*
 !.env.example
 
+.neon
+
 .DS_Store
 .idea/
 .vscode/

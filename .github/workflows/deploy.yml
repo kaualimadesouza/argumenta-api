@@ -54,7 +54,9 @@ jobs:
 
       - name: Run Migrations
         env:
-          ARGUMENTA_DATABASE_URL: ${{ secrets.ARGUMENTA_DATABASE_URL }}
+          # direct (non-pooled) connection: pgbouncer transaction mode does not
+          # support the session state Alembic's DDL relies on
+          ARGUMENTA_DATABASE_URL: ${{ secrets.ARGUMENTA_DATABASE_URL_DIRECT }}
         run: |
           uv venv --python=3.12
           uv sync
