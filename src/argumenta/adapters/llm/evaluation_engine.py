@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Any
 
@@ -42,26 +43,33 @@ class EvaluationOutput(BaseModel):
     annotations: list[AnnotationOutput]
 
 
+_logger = logging.getLogger(__name__)
+
 _TOOL_NAME = "report_evaluation"
 _TOOL_DESCRIPTION = "Report the structured evaluation of the student's text."
 
 
 def parse_engine_output(payload: dict[str, Any], text: str) -> EvaluationOutput:
-    """Validate the tool payload: pydantic contract and spans inside the text.
-    Which dimensions were required is checked once, in the use case, so every
-    engine is held to it. Raises EvaluationFailedError."""
+    """Validate the tool payload: pydantic contract, and spans inside the text.
+    LLM offsets are unreliable, so an out-of-bounds span drops that annotation
+    instead of discarding the whole paid correction. Raises EvaluationFailedError."""
     try:
         output = EvaluationOutput.model_validate(payload)
     except ValidationError as error:
         raise EvaluationFailedError(f"engine output rejected: {error}") from error
 
+    kept = []
     for annotation in output.annotations:
         if annotation.span_end <= annotation.span_start or annotation.span_end > len(text):
-            raise EvaluationFailedError(
-                f"annotation span [{annotation.span_start}, {annotation.span_end}) "
-                f"outside the text (len={len(text)})"
+            _logger.warning(
+                "dropping annotation span [%s, %s) outside the text (len=%s)",
+                annotation.span_start,
+                annotation.span_end,
+                len(text),
             )
-    return output
+            continue
+        kept.append(annotation)
+    return output.model_copy(update={"annotations": kept})
 
 
 def _format_anchors(request: EngineRequest) -> str:

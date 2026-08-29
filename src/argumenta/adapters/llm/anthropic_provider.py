@@ -19,6 +19,7 @@ from argumenta.adapters.llm.provider import (
     StructuredReply,
     TextReply,
 )
+from argumenta.adapters.llm.schema import anthropic_strict_schema
 from argumenta.adapters.llm.usage import billed_input_tokens
 from argumenta.domain.errors import EvaluationFailedError
 
@@ -63,10 +64,13 @@ class AnthropicProvider:
                 system=call.system,
                 messages=self._messages(call),
                 tools=[
+                    # strict guarantees the payload validates: without it Sonnet
+                    # occasionally drops a required field (seen live: severity)
                     ToolParam(
                         name=call.name,
                         description=call.description,
-                        input_schema=call.schema,
+                        input_schema=anthropic_strict_schema(call.schema),
+                        strict=True,
                     )
                 ],
                 tool_choice=ToolChoiceToolParam(type="tool", name=call.name),
