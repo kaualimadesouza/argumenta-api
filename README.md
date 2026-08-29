@@ -107,12 +107,20 @@ O motor de correção LLM possui uma suíte de calibração em `tests/calibratio
 
 ## Deploy
 
-O deploy é automatizado no GitHub Actions, utilizando **AWS SAM** para subir a API como uma função **AWS Lambda** junto a um **API Gateway**, num modelo 100% Serverless.
+O deploy é automatizado no GitHub Actions (`.github/workflows/deploy.yml`), num pipeline de 4 estágios: **CI** (lint, types, testes) → **Build and Push** (imagem Docker da API, publicada no Amazon ECR) → **Deploy** (migrations do Alembic + `sam deploy`, subindo a função **AWS Lambda** por trás de um **API Gateway**) → **Notify** (mensagem no Telegram com o resultado).
+
+A função Lambda roda como container (`PackageType: Image`, ver `Dockerfile`), não como zip: o estágio de build gera a imagem e a envia ao ECR marcada com o SHA do commit, e o estágio de deploy só referencia essa imagem já publicada (`sam deploy` não builda nada, só atualiza a stack do CloudFormation para apontar pra ela). Isso desacopla "gerar o artefato" de "publicá-lo".
 
 O banco de dados de produção fica hospedado gratuitamente no **Neon** (Serverless Postgres), aproveitando o connection pooling nativo (`pooler.neon.tech`), o que é fundamental para a compatibilidade com a natureza altamente paralela do Lambda.
 
+**Antes do primeiro deploy**, crie o repositório no ECR (uma vez só, não é gerenciado pelo CloudFormation da stack, pra sobreviver caso a stack seja destruída):
+```bash
+aws ecr create-repository --repository-name argumenta-api --region us-east-1 \
+  --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+```
+
 **Secrets necessários no ambiente do GitHub:**
-- `AWS_ACCESS_KEY_ID`: Credencial da AWS com permissão para o deploy do SAM (CloudFormation, S3, IAM, Lambda, API Gateway).
+- `AWS_ACCESS_KEY_ID`: Credencial da AWS com permissão para o deploy do SAM (CloudFormation, S3, IAM, Lambda, API Gateway) e push no ECR.
 - `AWS_SECRET_ACCESS_KEY`: Chave secreta da AWS.
 - `ARGUMENTA_ANTHROPIC_API_KEY`: Chave do Claude.
 - `ARGUMENTA_GOOGLE_CLIENT_ID`: OAuth do Google.
@@ -120,6 +128,8 @@ O banco de dados de produção fica hospedado gratuitamente no **Neon** (Serverl
 - `ARGUMENTA_DATABASE_URL`: URL do Neon **com pooler**, formato `postgresql+psycopg://user:pass@ep-...-pooler.neon.tech/db`. Usada em runtime pela função Lambda. <!-- pragma: allowlist secret -->
 - `ARGUMENTA_DATABASE_URL_DIRECT`: URL do Neon **sem pooler** (mesmo host, sem o sufixo `-pooler`), mesmo formato acima. Usada só para rodar as migrations do Alembic: o pooler do Neon roda em modo transaction do pgbouncer, que não sustenta o estado de sessão que o Alembic depende. <!-- pragma: allowlist secret -->
 - `ARGUMENTA_APP_SECRET`: Chave secreta da aplicação para assinar os tokens JWT.
+- `TELEGRAM_BOT_TOKEN`: token do bot criado com o [@BotFather](https://t.me/BotFather), usado pelo estágio de notificação.
+- `TELEGRAM_CHAT_ID`: id do chat (pessoal) pra onde a notificação de sucesso/falha do deploy é enviada.
 
 **Como acionar:**
 ```bash

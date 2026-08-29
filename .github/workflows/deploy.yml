@@ -18,12 +18,48 @@ concurrency:
   group: deploy-api-${{ github.event.inputs.environment || 'dev' }}
   cancel-in-progress: false
 
+env:
+  ECR_REPOSITORY: argumenta-api
+  ENV_NAME: ${{ github.event.inputs.environment || 'dev' }}
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  deploy:
+  build-and-push:
     needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      image-uri: ${{ steps.image.outputs.uri }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} # pragma: allowlist secret
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # pragma: allowlist secret
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker buildx build --platform linux/amd64 --provenance=false \
+            --push -t "$REGISTRY/$ECR_REPOSITORY:$TAG" .
+          echo "uri=$REGISTRY/$ECR_REPOSITORY:$TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +72,6 @@ jobs:
       - name: Install UV
         run: pip install uv
 
-      - name: Generate requirements.txt for SAM
-        run: uv pip compile pyproject.toml -o requirements.txt
-
       - name: Setup AWS SAM
         uses: aws-actions/setup-sam@v2
 
@@ -48,9 +81,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} # pragma: allowlist secret
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # pragma: allowlist secret
           aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
-
-      - name: Build SAM application
-        run: sam build
 
       - name: Run Migrations
         env:
@@ -65,7 +95,7 @@ jobs:
 
       - name: Deploy SAM application
         env:
-          ENV_NAME: ${{ github.event.inputs.environment || 'dev' }}
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image-uri }}
         run: |
           sam deploy --no-confirm-changeset --no-fail-on-empty-changeset \
             --stack-name argumenta-api-${ENV_NAME} \
@@ -73,8 +103,42 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --parameter-overrides \
               Stage=${ENV_NAME} \
+              ImageUri="${IMAGE_URI}" \
               ArgumentaAnthropicApiKey="${{ secrets.ARGUMENTA_ANTHROPIC_API_KEY }}" \
               ArgumentaGoogleClientId="${{ secrets.ARGUMENTA_GOOGLE_CLIENT_ID }}" \
               ArgumentaGoogleClientSecret="${{ secrets.ARGUMENTA_GOOGLE_CLIENT_SECRET }}" \
               ArgumentaDatabaseUrl="${{ secrets.ARGUMENTA_DATABASE_URL }}" \
               ArgumentaAppSecret="${{ secrets.ARGUMENTA_APP_SECRET }}"
+
+  notify:
+    needs: [ci, build-and-push, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CI_RESULT: ${{ needs.ci.result }}
+          BUILD_RESULT: ${{ needs.build-and-push.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        run: |
+          if [ "$DEPLOY_RESULT" = "success" ]; then
+            ICON="✅"
+            STATUS_TEXT="concluido"
+          elif [ "$CI_RESULT" != "success" ]; then
+            ICON="❌"
+            STATUS_TEXT="falhou no CI"
+          elif [ "$BUILD_RESULT" != "success" ]; then
+            ICON="❌"
+            STATUS_TEXT="falhou ao construir/enviar a imagem"
+          else
+            ICON="❌"
+            STATUS_TEXT="falhou no deploy"
+          fi
+          MESSAGE="${ICON} Deploy do argumenta-api (${ENV_NAME}) ${STATUS_TEXT}
+commit: ${GITHUB_SHA}
+run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}"

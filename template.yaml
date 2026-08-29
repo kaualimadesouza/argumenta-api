@@ -34,14 +34,16 @@ Parameters:
   ArgumentaAppSecret:
     Type: String
     NoEcho: true
+  ImageUri:
+    Type: String
+    Description: Pre-built ECR image URI (tagged with the commit SHA); built and pushed by the pipeline's Build and Push job, not by sam build.
 
 Resources:
   FastApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      Handler: src.argumenta.entrypoints.rest_application.handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Ref ImageUri
       Architectures:
         - x86_64
       Environment:
