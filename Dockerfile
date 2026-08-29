@@ -1,15 +1,15 @@
-FROM python:3.12-slim
+FROM ghcr.io/astral-sh/uv:0.9.26 AS uv
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+FROM public.ecr.aws/lambda/python:3.12
 
-WORKDIR /app
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+COPY --from=uv /uv /usr/local/bin/uv
 
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+COPY pyproject.toml uv.lock ${LAMBDA_TASK_ROOT}/
+RUN cd ${LAMBDA_TASK_ROOT} \
+    && uv export --frozen --no-dev --no-emit-project --no-hashes --extra google --format requirements.txt -o requirements.txt \
+    && pip install --no-cache-dir -r requirements.txt \
+    && rm -f requirements.txt pyproject.toml uv.lock
 
-COPY src ./src
-RUN uv sync --frozen --no-dev
+COPY src/argumenta ${LAMBDA_TASK_ROOT}/argumenta
 
-EXPOSE 8000
-CMD ["uv", "run", "--no-dev", "uvicorn", "argumenta.entrypoints.rest_application:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["argumenta.entrypoints.rest_application.handler"]

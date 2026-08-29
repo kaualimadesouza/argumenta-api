@@ -1,58 +1,89 @@
 ---
 name: deploy
-description: Deploy the API to the VPS over SSH with blue/green containers from GHCR, using the asq-data workflow model. Use when setting up or running a deploy, editing GitHub Actions deploy workflows, configuring VPS secrets, or debugging a failed deploy or rollback.
+description: Deploy the API to AWS Lambda (container image) behind API Gateway, infra as Terraform in infrastructure/, driven by a 4-stage GitHub Actions pipeline (CI, Build and Push, Deploy, Notify). Use when setting up or running a deploy, editing the deploy workflow or Terraform, configuring deploy secrets/variables, or debugging a failed deploy.
 ---
 
-# Deploy (SSH to VPS, blue/green)
+# Deploy (AWS Lambda, container image, Terraform)
 
-The deploy model is copied from the asq-data repo and lands with issue #3. Local
-model source (read these before editing anything):
+Replaced an earlier SAM/CloudFormation version (2026-08-29) and, before that, a
+planned SSH-to-VPS blue/green model that was never actually built for this repo.
+Always check `.github/workflows/deploy.yml` and `infrastructure/` directly before
+trusting a description of the pipeline, this file included.
 
-- `/home/kaua/app/asq-data/.github/workflows/_deploy-to-vps-ssh.yml` (reusable workflow)
-- `/home/kaua/app/asq-data/.github/workflows/deploy-backtest.yml` (caller example)
-- `/home/kaua/app/asq-data/.github/scripts/deploy-vps.sh` (blue/green + rollback)
-- `/home/kaua/app/asq-data/.github/config/services.json` (service config)
+**Load the `aws` skill before touching any AWS resource by hand** (CLI or
+console): it has the account id, the required profile, and the incident that
+made that rule non-negotiable.
 
-## Architecture
+## Pipeline (`.github/workflows/deploy.yml`)
 
-`deploy-api.yml` (caller: `workflow_dispatch` with choice dev/prod + push on main)
-runs CI, resolves environment and version, builds the Docker image, pushes to
-`ghcr.io/kaualimadesouza/argumenta-api`, then calls `_deploy-to-vps-ssh.yml`, which
-ships `deploy-vps.sh` to the VPS via scp. The script starts the new container next
-to the old one, hits `GET /health`, switches traffic on success and rolls back
-automatically on failure.
+Triggers: push to `main`, or `workflow_dispatch` with an `environment` input
+(`dev` | `prod`). Four jobs, each gated on the previous:
 
-Two deliberate adaptations from the asq-data original:
+1. **ci** — reuses `ci.yml` (lint, mypy strict, import contracts, bandit, tests).
+2. **build-and-push** — logs into ECR, `docker buildx build --platform linux/amd64 --provenance=false --push`, tags the image with `github.sha`, outputs the full image URI.
+3. **deploy** — runs `alembic upgrade head` against `ARGUMENTA_DATABASE_URL_DIRECT`, then `terraform init`/`apply` in `infrastructure/`, passing the built image URI and every secret as `TF_VAR_*` env vars (never as `-var` CLI args, never echoed).
+4. **notify** — `if: always()`, needs all three prior jobs, posts a Telegram message naming which stage failed (or success).
 
-- Registry is GHCR with `GITHUB_TOKEN` (no ECR, no AWS credentials).
-- The app env-file comes from the `SERVICE_ENV` Environment secret
-  (no Secrets Manager).
+## Infra (`infrastructure/`, Terraform)
 
-## Environment secrets (per GitHub Environment: dev, prod)
+- `backend.tf` — S3 backend with native locking (`use_lockfile = true`, needs Terraform ≥1.10); bucket/key/region are passed via `-backend-config` at `terraform init` time (partial config), never hardcoded, so the same files serve every stage.
+- `variables.tf` / `main.tf` — the Lambda function (`package_type = "Image"`, `image_uri` from the build job), its IAM execution role (`AWSLambdaBasicExecutionRole`), an HTTP API Gateway with one route (`ANY /{proxy+}`, matches the SAM behavior it replaced), and the `aws_lambda_permission` letting API Gateway invoke it.
+- `outputs.tf` — `api_endpoint`.
+- `ecr-lifecycle-policy.json` — keeps only the last 10 images; applied by hand (see bootstrap below), not by Terraform.
 
-`VPS_HOST`, `VPS_DEPLOY_USER`, `VPS_SSH_PRIVATE_KEY`, `VPS_SSH_KNOWN_HOSTS`,
-`SERVICE_ENV` (the full .env content).
+`Dockerfile` (repo root, not in `infrastructure/`: it's app packaging, the build context needs it at root) builds the Lambda container image: multi-stage from `ghcr.io/astral-sh/uv` + `public.ecr.aws/lambda/python:3.12`, `uv export --frozen --no-dev --no-emit-project --no-hashes` (add `--extra <name>` here whenever an optional LLM vendor extra is enabled, e.g. `--extra google` for Gemini) into `requirements.txt`, then `pip install`. Copies `src/argumenta` (not `src/`) into `${LAMBDA_TASK_ROOT}/argumenta` — hatchling's `packages = ["src/argumenta"]` maps it to the top-level `argumenta` package, so the handler is `argumenta.entrypoints.rest_application.handler`, never `src.argumenta...` (that exact mismatch was a real bug, caught testing the image locally, before the very first real deploy).
+
+## One-time bootstrap (manual, outside Terraform, on purpose)
+
+Two things must exist before the first deploy, and are deliberately NOT managed
+by Terraform so they survive `terraform destroy`: the ECR repository and the S3
+state bucket. Exact commands are in the README's Deploy section (they change
+rarely enough not to duplicate here) — includes applying
+`ecr-lifecycle-policy.json` and registering the bucket name as the `TF_STATE_BUCKET`
+GitHub variable.
+
+## Secrets and variables (GitHub, repo-level)
+
+Secrets (sensitive): `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (the
+`argumenta-api-deployer` IAM user, never the account admin — see `aws` skill),
+`ARGUMENTA_DATABASE_URL` (pooled) / `ARGUMENTA_DATABASE_URL_DIRECT` (direct, for
+migrations only — see `neon-postgres` skill for why), `ARGUMENTA_JWT_SECRET`,
+`ARGUMENTA_ANTHROPIC_API_KEY`, `ARGUMENTA_GOOGLE_API_KEY` (Gemini, not the same
+thing as the OAuth pair below), `ARGUMENTA_GOOGLE_CLIENT_ID`/`_SECRET` (Google
+login OAuth), `TELEGRAM_BOT_TOKEN`/`_CHAT_ID`.
+
+Variables (not sensitive, `gh variable set`): `TF_STATE_BUCKET`,
+`ARGUMENTA_LLM_VENDOR` (`anthropic` | `openai` | `google`),
+`ARGUMENTA_EVALUATION_MODEL`, `ARGUMENTA_REACTION_MODEL`. Changing which vendor
+answers is a variable change plus the matching API key secret, no code change
+and no new image build — but the evaluation/reaction model names must be valid
+for whichever vendor is selected (e.g. `claude-sonnet-5` for anthropic,
+`gemini-3-pro` for google), or `Settings()` construction fails at cold start.
 
 ## Operating it
 
 ```bash
-gh workflow run deploy-api.yml -f environment=dev   # manual deploy
-gh run watch                                        # follow it
-curl -fsS https://<host>/health                     # verify
+gh workflow run deploy.yml -f environment=dev   # manual deploy (dev/prod)
+gh run watch
 ```
+Also runs automatically on every push to `main`.
 
-## Migrations run on every deploy (founder decision, 2026-08-20)
+## Migrations
 
-The deploy MUST run `alembic upgrade head` before switching traffic to the new
-container: after pulling the new image and before the healthcheck/switch, the
-script runs the migration from the new image
-(`docker run --rm --env-file <env> <image> alembic upgrade head`). A failed
-migration aborts the deploy and keeps the old container serving. Consequence for
-schema work: every migration must be forward-compatible with the container still
-running (expand/contract; never drop or rename a column the live version reads).
+Same founder rule as always: migrations must be forward-compatible with the
+code still running when they land (expand/contract; never drop or rename a
+column the live version reads). What changed is *where* this is enforced:
+`alembic upgrade head` now runs as its own deploy step, against the direct
+(non-pooled) Neon URL, strictly before `terraform apply` touches the Lambda.
 
-Rollback: the script rolls back on failed healthcheck by itself; for a manual
-rollback re-run the workflow pinned to the previous image tag. Migrations are NOT
-rolled back automatically (the old code must tolerate the new schema, see above);
-a manual `alembic downgrade` is the escape hatch. Never edit containers on the
-VPS by hand; the script owns their lifecycle.
+## Rollback — no automatic mechanism, unlike the old VPS model this replaced
+
+There is no health-checked traffic switch and no automatic rollback here: once
+`terraform apply` updates the function, every new invocation runs the new
+image immediately. If a bad deploy ships, the recourse is either a `git revert`
++ push (a normal new deploy, with a new commit SHA and a new image), or by
+hand: `terraform apply -var="image_uri=<previous-sha-uri>"` from
+`infrastructure/`, using an image still in ECR (the lifecycle policy only
+keeps the last 10, so this window isn't unlimited). Migrations are never
+rolled back automatically either; `alembic downgrade` is the manual escape
+hatch, same as before.

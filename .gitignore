@@ -11,6 +11,16 @@ htmlcov/
 .env.*
 !.env.example
 
+.neon
+
+# terraform state and local working dirs; state lives in the remote S3 backend,
+# never in git (it contains the resolved secret values)
+infrastructure/.terraform/
+infrastructure/*.tfstate
+infrastructure/*.tfstate.*
+infrastructure/*.tfvars
+infrastructure/crash.log
+
 .DS_Store
 .idea/
 .vscode/
