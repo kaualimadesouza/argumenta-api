@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/kaualimadesouza/argumenta-api/compare/v0.2.0...v0.3.0) (2026-08-30)
+
+
+### Features
+
+* adicionar listagem de historico de tentativas de capitulo ([#72](https://github.com/kaualimadesouza/argumenta-api/issues/72)) ([a8a1fdd](https://github.com/kaualimadesouza/argumenta-api/commit/a8a1fddf92f61688b2524100a1b41b3e3b8e55e2)), closes [#71](https://github.com/kaualimadesouza/argumenta-api/issues/71)
+
+
+### Bug Fixes
+
+* ci cancela deploy concorrente ([#73](https://github.com/kaualimadesouza/argumenta-api/issues/73)) ([6d8e151](https://github.com/kaualimadesouza/argumenta-api/commit/6d8e151fd27977c283f9b5d512bc469019fbda2d))
+* **submissions:** resolve CI failures in submission history ([#76](https://github.com/kaualimadesouza/argumenta-api/issues/76)) ([634612d](https://github.com/kaualimadesouza/argumenta-api/commit/634612d077286ff1ec19ab230cef620c378667ab))
+
 ## [0.2.0](https://github.com/kaualimadesouza/argumenta-api/compare/v0.1.0...v0.2.0) (2026-08-30)
 
 
