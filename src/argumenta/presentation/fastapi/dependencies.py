@@ -346,5 +346,6 @@ def get_record_telemetry_use_case(
 
 def get_get_submission_history_use_case(
     submissions: Annotated[SqlAlchemySubmissionRepository, Depends(get_submission_repository)],
+    progress: Annotated[SqlAlchemyProgressWriter, Depends(get_progress_writer)],
 ) -> GetSubmissionHistoryUseCase:
-    return GetSubmissionHistoryUseCase(submissions)
+    return GetSubmissionHistoryUseCase(submissions, progress)

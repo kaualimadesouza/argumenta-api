@@ -319,7 +319,7 @@ class TestSubmissionHistory:
         assert len(submissions) == 2
         assert submissions[0]["attempt_number"] == 2
         assert submissions[0]["verdict"] == "failed_persuasion"
-        assert submissions[0]["lens"]["exam"] == "fuvest"
+        assert submissions[0]["lens"]["exam"] == "enem"
 
         assert submissions[1]["attempt_number"] == 1
         assert submissions[1]["verdict"] == "failed_technical"
@@ -333,7 +333,7 @@ class TestSubmissionHistory:
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_get_submissions_for_locked_chapter_returns_404(
+    def test_get_submissions_for_locked_chapter_returns_403(
         self,
         game: tuple[TestClient, uuid.UUID],
         db_engine: Engine,
@@ -343,4 +343,4 @@ class TestSubmissionHistory:
             locked_id = session.scalar(select(Chapter.id).where(Chapter.position == 2))
 
         response = client.get(f"/chapters/{locked_id}/submissions")
-        assert response.status_code == 404
+        assert response.status_code == 403
