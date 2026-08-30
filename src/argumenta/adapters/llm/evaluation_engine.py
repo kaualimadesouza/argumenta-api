@@ -2,6 +2,7 @@ import logging
 import time
 from typing import Any
 
+from opentelemetry import metrics, trace
 from pydantic import BaseModel, Field, ValidationError
 
 from argumenta.adapters.llm.effort import Effort
@@ -44,6 +45,18 @@ class EvaluationOutput(BaseModel):
 
 
 _logger = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
+_meter = metrics.get_meter(__name__)
+_latency_histogram = _meter.create_histogram(
+    "argumenta.evaluation.latency",
+    unit="ms",
+    description="Duration of the graded-correction LLM call",
+)
+_tokens_counter = _meter.create_counter(
+    "argumenta.llm.tokens",
+    unit="{token}",
+    description="LLM tokens spent, by engine and direction",
+)
 
 _TOOL_NAME = "report_evaluation"
 _TOOL_DESCRIPTION = "Report the structured evaluation of the student's text."
@@ -102,28 +115,40 @@ class LlmEvaluationEngine:
 
     def evaluate(self, request: EngineRequest) -> EngineResult:
         started = time.monotonic()
-        reply = self._provider.structured(
-            StructuredCall(
-                system=SYSTEM_PROMPT,
-                user=USER_TEMPLATE.format(
-                    chapter_objective=request.chapter_objective,
-                    evaluator_brief=request.evaluator_brief,
-                    persona_brief=request.persona_brief,
-                    min_words=request.min_words,
-                    max_words=request.max_words,
-                    anchors=_format_anchors(request),
-                    dimensions=_format_dimensions(request.required_dimensions),
-                    format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
-                    text=defuse_fence(request.text),
-                ),
-                max_tokens=self._max_tokens,
-                effort=self._effort,
-                name=_TOOL_NAME,
-                description=_TOOL_DESCRIPTION,
-                schema=EvaluationOutput.model_json_schema(),
+        with _tracer.start_as_current_span("argumenta.evaluation") as span:
+            reply = self._provider.structured(
+                StructuredCall(
+                    system=SYSTEM_PROMPT,
+                    user=USER_TEMPLATE.format(
+                        chapter_objective=request.chapter_objective,
+                        evaluator_brief=request.evaluator_brief,
+                        persona_brief=request.persona_brief,
+                        min_words=request.min_words,
+                        max_words=request.max_words,
+                        anchors=_format_anchors(request),
+                        dimensions=_format_dimensions(request.required_dimensions),
+                        format_rule=FULL_ESSAY_RULE if request.full_essay else SCENE_TEXT_RULE,
+                        text=defuse_fence(request.text),
+                    ),
+                    max_tokens=self._max_tokens,
+                    effort=self._effort,
+                    name=_TOOL_NAME,
+                    description=_TOOL_DESCRIPTION,
+                    schema=EvaluationOutput.model_json_schema(),
+                )
             )
+            latency_ms = int((time.monotonic() - started) * 1000)
+            span.set_attribute("llm.model", reply.model)
+            span.set_attribute("argumenta.prompt_version", PROMPT_VERSION)
+            span.set_attribute("llm.usage.input_tokens", reply.usage.input_tokens or 0)
+            span.set_attribute("llm.usage.output_tokens", reply.usage.output_tokens or 0)
+        _latency_histogram.record(latency_ms, {"model": reply.model})
+        _tokens_counter.add(
+            reply.usage.input_tokens or 0, {"engine": "evaluation", "direction": "input"}
         )
-        latency_ms = int((time.monotonic() - started) * 1000)
+        _tokens_counter.add(
+            reply.usage.output_tokens or 0, {"engine": "evaluation", "direction": "output"}
+        )
         output = parse_engine_output(reply.payload, request.text)
 
         return EngineResult(

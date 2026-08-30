@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -14,6 +15,7 @@ def get_engine() -> Engine:
     global _engine
     if _engine is None:
         _engine = create_engine(get_settings().database_url, pool_pre_ping=True)
+        SQLAlchemyInstrumentor().instrument(engine=_engine)
     return _engine
 
 

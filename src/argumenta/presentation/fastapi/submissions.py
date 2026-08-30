@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from opentelemetry import metrics
 from pydantic import BaseModel, Field
 
 from argumenta.application.gameplay.ports import DraftRepository, ProgressWriter
@@ -27,6 +28,11 @@ from argumenta.presentation.fastapi.dependencies import (
 )
 
 router = APIRouter(prefix="/chapters", tags=["submissions"])
+
+_meter = metrics.get_meter(__name__)
+_submissions_counter = _meter.create_counter(
+    "argumenta.submissions", description="Submissions graded, by verdict"
+)
 
 Progress = Annotated[ProgressWriter, Depends(get_progress_writer)]
 Drafts = Annotated[DraftRepository, Depends(get_draft_repository)]
@@ -115,6 +121,7 @@ def submit_argument(
         )
     )
     outcome = result.outcome
+    _submissions_counter.add(1, {"verdict": outcome.verdict.value})
     annotations = [
         AnnotationResponse(
             span_start=a.span_start,

@@ -101,6 +101,31 @@ com título convencional (validado pelo workflow de título).
 Frontend: [argumenta-web](https://github.com/kaualimadesouza/argumenta-web).
 Aplicativo (fase 2): [argumenta-mobile](https://github.com/kaualimadesouza/argumenta-mobile).
 
+## Observabilidade
+
+Traces (FastAPI, SQLAlchemy, chamadas HTTP ao provedor de LLM), métricas (tokens
+gastos por engine/direção, latência da correção, submissões por veredito, taxa
+de falha do motor por tipo de erro, fração do orçamento mensal usada) e logs
+estruturados em JSON (correlacionados por `request_id` e por `trace_id`/`span_id`
+quando dentro de um trace) saem via OTLP quando `OTEL_EXPORTER_OTLP_ENDPOINT`
+está configurado; sem ele, tracing e métricas ficam no-op (nenhum comportamento
+muda em dev ou nos testes).
+
+O backend hoje é o **SigNoz, local, por decisão do dono** (2026-08-29); nada em
+produção aponta para ele ainda (issue #52, que decide o backend gerenciado
+quando/se isso for necessário). Para rodar localmente:
+
+```bash
+git clone -b main https://github.com/SigNoz/signoz.git /tmp/signoz
+cd /tmp/signoz/deploy/docker
+docker compose up -d
+```
+
+Isso sobe o SigNoz (ClickHouse + collector + query-service + UI) em
+`http://localhost:8080`, com o coletor OTLP ouvindo em `http://localhost:4318`
+(HTTP) e `:4317` (gRPC). Aponte a API para ele com
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` no `.env` e reinicie.
+
 ## Calibração do Motor
 
 O motor de correção LLM possui uma suíte de calibração em `tests/calibration` para proteger contra regressões e variações. A tolerância contra o gabarito autoral é de 15 pontos por dimensão. A variância do modelo por chamada (ruído de amostragem) foi medida empiricamente (3 corridas sucessivas) em **5 pontos**; esse valor é usado como banda estrita (`TIGHT_BAND`) para proteger contra drift quando uma baseline medida já existe para o prompt atual.

@@ -3,8 +3,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from mangum import Mangum
+from opentelemetry import metrics
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from argumenta import __version__
+from argumenta.adapters.observability.logging import configure_logging
+from argumenta.adapters.observability.telemetry import configure_telemetry
 from argumenta.domain import errors
 from argumenta.presentation.fastapi.auth import router as auth_router
 from argumenta.presentation.fastapi.body_limit import LimitRequestBody
@@ -12,12 +16,18 @@ from argumenta.presentation.fastapi.health import router as health_router
 from argumenta.presentation.fastapi.me import router as me_router
 from argumenta.presentation.fastapi.progress import router as progress_router
 from argumenta.presentation.fastapi.reactions import router as reactions_router
+from argumenta.presentation.fastapi.request_id import RequestIdMiddleware
 from argumenta.presentation.fastapi.submissions import router as submissions_router
 from argumenta.presentation.fastapi.telemetry import router as telemetry_router
 from argumenta.presentation.fastapi.track import router as track_router
 from argumenta.settings import get_settings
 
 _logger = logging.getLogger(__name__)
+_meter = metrics.get_meter(__name__)
+_evaluation_failures = _meter.create_counter(
+    "argumenta.evaluation.failures",
+    description="5xx domain errors, by exception type",
+)
 
 ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EmailAlreadyRegisteredError: 409,
@@ -41,8 +51,11 @@ ERROR_STATUS: dict[type[errors.DomainError], int] = {
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
     app = FastAPI(title="Argumenta API", version=__version__)
-    app.add_middleware(LimitRequestBody, max_bytes=get_settings().max_request_bytes)
+    app.add_middleware(LimitRequestBody, max_bytes=settings.max_request_bytes)
+    app.add_middleware(RequestIdMiddleware)
+    FastAPIInstrumentor.instrument_app(app)
 
     app.include_router(health_router)
     app.include_router(auth_router)
@@ -60,10 +73,17 @@ def create_app() -> FastAPI:
             # the response hides the message from the student on purpose; the
             # log is the only place the real cause survives
             _logger.error("%s: %s", type(exc).__name__, exc)
+            _evaluation_failures.add(1, {"error_type": type(exc).__name__})
         return JSONResponse(status_code=status_code, content={"detail": type(exc).__name__})
 
     return app
 
+
+# Global process state (root logger handlers, the OTel SDK registry): configured
+# once here, at import time, never inside create_app() itself, which tests call
+# on every fixture and would otherwise fight pytest's own caplog handler.
+configure_logging()
+configure_telemetry(get_settings())
 
 app = create_app()
 

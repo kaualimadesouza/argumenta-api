@@ -5,8 +5,12 @@ import logging
 
 import pytest
 from fastapi.testclient import TestClient
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from tests.otel_helpers import counter_points, point_attributes
 
 from argumenta.domain import errors
+from argumenta.entrypoints import rest_application
 from argumenta.entrypoints.rest_application import ERROR_STATUS, create_app
 
 
@@ -51,3 +55,28 @@ def test_a_5xx_domain_error_is_logged_with_its_message(
     assert response.status_code == 502
     assert response.json() == {"detail": "EvaluationFailedError"}
     assert "the vendor said no" in caplog.text
+
+
+def test_a_5xx_domain_error_increments_the_failures_counter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Issue #51: the metric that feeds the failure-rate alert of issue #52."""
+    reader = InMemoryMetricReader()
+    counter = (
+        MeterProvider(metric_readers=[reader])
+        .get_meter("test")
+        .create_counter("argumenta.evaluation.failures")
+    )
+    monkeypatch.setattr(rest_application, "_evaluation_failures", counter)
+    app = create_app()
+
+    @app.get("/boom-metric")
+    def boom() -> None:
+        raise errors.EvaluationFailedError("boom")
+
+    TestClient(app, raise_server_exceptions=False).get("/boom-metric")
+
+    points = counter_points(reader.get_metrics_data(), "argumenta.evaluation.failures")
+    assert len(points) == 1
+    assert points[0].value == 1
+    assert point_attributes(points[0])["error_type"] == "EvaluationFailedError"
