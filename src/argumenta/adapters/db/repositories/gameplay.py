@@ -235,7 +235,7 @@ class SqlAlchemySubmissionRepository:
                 PastAttempt(
                     submission_id=submission.id,
                     attempt_number=submission.attempt_number,
-                    body=submission.text,
+                    body=submission.body,
                     verdict=evaluation.verdict,
                     average_score=float(evaluation.average_score),
                     floor_value=evaluation.floor_value,

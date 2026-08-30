@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from argumenta.application.gameplay.ports import PastAttempt
-from argumenta.domain.enums import Verdict
+from argumenta.application.gameplay.ports import PastAttempt, ProgressWriter
+from argumenta.domain.enums import ChapterStatus, Verdict
+from argumenta.domain.errors import ChapterLockedError
 from argumenta.domain.evaluation import ScoredDimension
 from argumenta.domain.lenses import DEFAULT_EXAM, LensView, project_lens
 
@@ -32,8 +33,12 @@ class SubmissionHistoryRepository(Protocol):
 @dataclass(frozen=True)
 class GetSubmissionHistoryUseCase:
     submissions: SubmissionHistoryRepository
+    progress: ProgressWriter
 
     def execute(self, user_id: uuid.UUID, chapter_id: uuid.UUID) -> tuple[PastAttemptView, ...]:
+        if self.progress.status_of(user_id, chapter_id) == ChapterStatus.LOCKED:
+            raise ChapterLockedError
+
         attempts = self.submissions.list_attempts(user_id, chapter_id)
         views = []
         for a in attempts:
