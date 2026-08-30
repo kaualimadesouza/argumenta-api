@@ -103,6 +103,15 @@ jobs:
           source .venv/bin/activate
           alembic upgrade head
 
+      # idempotent per story (already-present stories are left untouched),
+      # which is what lets it run on every deploy
+      - name: Seed content
+        env:
+          ARGUMENTA_DATABASE_URL: ${{ secrets.ARGUMENTA_DATABASE_URL }}
+        run: |
+          source .venv/bin/activate
+          python -m argumenta.entrypoints.seed_content
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
