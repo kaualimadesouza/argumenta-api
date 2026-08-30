@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
-from tests.integration.conftest import ScriptedEngine, submit_text
+from tests.integration.conftest import ScriptedEngine, submit_and_correction, submit_text
 
 from argumenta.adapters.db.models import Evaluation
 from argumenta.domain.enums import ChapterKind, Dimension, Exam
@@ -243,7 +243,7 @@ class TestSubmissionLens:
     ) -> None:
         client, chapter_id = game
 
-        body = submit_text(client, chapter_id).json()
+        body = submit_and_correction(client, chapter_id)["result"]
 
         lens = body["lens"]
         assert lens["exam"] == "enem"
@@ -263,7 +263,7 @@ class TestSubmissionLens:
         target = client.post("/me/targets", json={"exam": "fuvest", "year": 2027}).json()
         assert client.put(f"/me/targets/{target['id']}/activate").status_code == 204
 
-        body = submit_text(client, chapter_id).json()
+        body = submit_and_correction(client, chapter_id)["result"]
 
         internal = {s["dimension"]: s["score"] for s in body["scores"]}
         assert internal == dict.fromkeys(internal, 80), "internal scores stay untouched"
@@ -295,7 +295,7 @@ class TestSubmissionLens:
     ) -> None:
         client, boss_chapter_id = boss_game
 
-        body = submit_text(client, boss_chapter_id, body=BOSS_TEXT).json()
+        body = submit_and_correction(client, boss_chapter_id, body=BOSS_TEXT)["result"]
 
         assert Dimension.PROPOSTA_INTERVENCAO in engine_double.calls[-1].required_dimensions
         dimensions = {s["dimension"] for s in body["scores"]}

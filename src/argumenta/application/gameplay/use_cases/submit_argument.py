@@ -2,32 +2,19 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from argumenta.application.evaluation.use_cases import (
-    EvaluateArgument,
-    EvaluateArgumentUseCase,
-)
 from argumenta.application.gameplay.ports import (
-    ActiveExamReader,
     DailyActivityWriter,
-    DraftRepository,
     EvaluationContextRepository,
+    EvaluationDispatcher,
     NewSubmission,
+    PendingSubmission,
     ProgressWriter,
     SubmissionRepository,
 )
-from argumenta.domain.enums import ChapterStatus, Verdict
 from argumenta.domain.errors import ChapterNotFoundError, WordCountOutOfRangeError
-from argumenta.domain.evaluation import EvaluationOutcome, EvaluationRuler
-from argumenta.domain.lenses import (
-    DEFAULT_EXAM,
-    LensView,
-    grading_spec,
-    project_lens,
-)
 from argumenta.domain.submission import (
     DAILY_SUBMISSION_LIMIT,
     count_words,
-    next_status_for,
     submission_context_for,
 )
 
@@ -41,22 +28,11 @@ class SubmitArgument:
     paste_count: int = 0
 
 
-@dataclass(frozen=True)
-class SubmissionResult:
-    submission_id: uuid.UUID
-    evaluation_id: uuid.UUID
-    attempt_number: int
-    chapter_status: ChapterStatus
-    ruler: EvaluationRuler
-    outcome: EvaluationOutcome
-    lens: LensView
-    """The same internal correction, projected into the student's exam lens."""
-
-
 class SubmitArgumentUseCase:
-    """The central move of the game, one transaction end to end: gate word count
-    and the daily cap, run the correction pipeline, persist everything with the
-    ruler frozen, and advance the chapter state machine."""
+    """The entry move of the game: gate word count and the daily cap, persist
+    the submission as evaluating and hand it to the evaluator. The correction
+    itself runs out of band (EvaluateSubmissionUseCase), because it takes
+    longer than any HTTP timeout in front of us (issue #68)."""
 
     def __init__(
         self,
@@ -64,19 +40,15 @@ class SubmitArgumentUseCase:
         submissions: SubmissionRepository,
         progress: ProgressWriter,
         activity: DailyActivityWriter,
-        drafts: DraftRepository,
-        evaluate: EvaluateArgumentUseCase,
-        exams: ActiveExamReader,
+        dispatcher: EvaluationDispatcher,
     ) -> None:
         self._contexts = contexts
         self._submissions = submissions
         self._progress = progress
         self._activity = activity
-        self._drafts = drafts
-        self._evaluate = evaluate
-        self._exams = exams
+        self._dispatcher = dispatcher
 
-    def execute(self, request: SubmitArgument) -> SubmissionResult:
+    def execute(self, request: SubmitArgument) -> PendingSubmission:
         context = self._contexts.get_context(request.chapter_id)
         if context is None:
             raise ChapterNotFoundError
@@ -91,27 +63,12 @@ class SubmitArgumentUseCase:
                 f"{chapter.min_words} to {chapter.max_words}"
             )
 
+        # atomic gate BEFORE anything is handed off; rolls back with the
+        # request transaction if the hand-off fails
         now = datetime.now(tz=UTC)
-        # atomic gate BEFORE the LLM spends tokens; rolls back with the request
-        # transaction if anything after it fails
         self._activity.register_submission(request.user_id, now.date(), DAILY_SUBMISSION_LIMIT)
 
-        exam = self._exams.active_exam(request.user_id) or DEFAULT_EXAM
-        outcome = self._evaluate.execute(
-            EvaluateArgument(
-                text=request.body,
-                chapter_objective=chapter.objective,
-                evaluator_brief=context.evaluator_brief,
-                persona_brief=context.antagonist_persona,
-                min_words=chapter.min_words,
-                max_words=chapter.max_words,
-                ruler=context.ruler,
-                spec=grading_spec(chapter.kind, exam),
-            )
-        )
-
-        lens = project_lens(outcome.scores, exam, chapter.kind)
-        stored = self._submissions.store(
+        pending = self._submissions.create_pending(
             NewSubmission(
                 user_id=request.user_id,
                 chapter_id=request.chapter_id,
@@ -120,31 +77,7 @@ class SubmitArgumentUseCase:
                 word_count=word_count,
                 typing_ms=request.typing_ms,
                 paste_count=request.paste_count,
-            ),
-            outcome,
-            context.ruler,
-            lens,
+            )
         )
-
-        new_status = next_status_for(outcome.verdict)
-        passed = outcome.verdict == Verdict.APPROVED
-        self._progress.apply_result(
-            user_id=request.user_id,
-            chapter_id=request.chapter_id,
-            status=new_status,
-            passing_submission_id=stored.submission_id if passed else None,
-            at=now,
-        )
-        if passed:
-            self._activity.register_approval(request.user_id, now.date())
-            self._drafts.discard(request.user_id, request.chapter_id)
-
-        return SubmissionResult(
-            submission_id=stored.submission_id,
-            evaluation_id=stored.evaluation_id,
-            attempt_number=stored.attempt_number,
-            chapter_status=new_status,
-            ruler=context.ruler,
-            outcome=outcome,
-            lens=lens,
-        )
+        self._dispatcher.dispatch(pending.submission_id)
+        return pending

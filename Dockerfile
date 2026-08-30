@@ -12,4 +12,4 @@ RUN cd ${LAMBDA_TASK_ROOT} \
 
 COPY src/argumenta ${LAMBDA_TASK_ROOT}/argumenta
 
-CMD ["argumenta.entrypoints.rest_application.handler"]
+CMD ["argumenta.entrypoints.lambda_handler.handler"]

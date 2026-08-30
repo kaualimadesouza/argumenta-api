@@ -4,9 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.gameplay.ports import DraftRepository, ProgressWriter
 from argumenta.application.gameplay.use_cases import (
+    CorrectionView,
+    GetSubmissionUseCase,
     SaveDraftUseCase,
     SubmitArgument,
     SubmitArgumentUseCase,
@@ -17,27 +18,40 @@ from argumenta.domain.enums import (
     Dimension,
     Exam,
     Severity,
+    SubmissionStatus,
     Verdict,
 )
 from argumenta.domain.lenses import ScaleSource
 from argumenta.presentation.fastapi.dependencies import (
     CurrentUserId,
     get_draft_repository,
+    get_get_submission_use_case,
     get_progress_writer,
     get_submit_argument_use_case,
 )
 
 router = APIRouter(prefix="/chapters", tags=["submissions"])
+polling_router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 Progress = Annotated[ProgressWriter, Depends(get_progress_writer)]
 Drafts = Annotated[DraftRepository, Depends(get_draft_repository)]
 SubmitUseCase = Annotated[SubmitArgumentUseCase, Depends(get_submit_argument_use_case)]
+GetUseCase = Annotated[GetSubmissionUseCase, Depends(get_get_submission_use_case)]
 
 
 class SubmissionRequest(BaseModel):
     body: str = Field(min_length=1)
     typing_ms: int | None = Field(default=None, ge=0)
     paste_count: int = Field(default=0, ge=0)
+
+
+class PendingSubmissionResponse(BaseModel):
+    """The correction runs out of band (issue #68): poll GET /submissions/{id}
+    until the status leaves "evaluating"."""
+
+    submission_id: uuid.UUID
+    attempt_number: int
+    status: SubmissionStatus
 
 
 class ScoreResponse(BaseModel):
@@ -78,12 +92,10 @@ class LensResponse(BaseModel):
     must not be rendered as an official grade."""
 
 
-class SubmissionResponse(BaseModel):
-    """Layered correction in one call: scoreboard, annotated spans, and the
-    'para passar' priorities, plus where the chapter state machine landed."""
+class CorrectionResponse(BaseModel):
+    """Layered correction: scoreboard, annotated spans, and the 'para passar'
+    priorities, plus where the chapter state machine landed."""
 
-    submission_id: uuid.UUID
-    attempt_number: int
     verdict: Verdict
     average_score: float
     floor_value: int
@@ -95,18 +107,29 @@ class SubmissionResponse(BaseModel):
     lens: LensResponse
 
 
+class SubmissionStateResponse(BaseModel):
+    """One polling answer: result is present exactly when status is
+    "evaluated"; "failed" is recoverable (the student may resubmit)."""
+
+    submission_id: uuid.UUID
+    chapter_id: uuid.UUID
+    attempt_number: int
+    status: SubmissionStatus
+    result: CorrectionResponse | None
+
+
 class DraftRequest(BaseModel):
     body: str
 
 
-@router.post("/{chapter_id}/submissions", status_code=201)
+@router.post("/{chapter_id}/submissions", status_code=202)
 def submit_argument(
     chapter_id: uuid.UUID,
     request: SubmissionRequest,
     user_id: CurrentUserId,
     use_case: SubmitUseCase,
-) -> SubmissionResponse:
-    result = use_case.execute(
+) -> PendingSubmissionResponse:
+    pending = use_case.execute(
         SubmitArgument(
             user_id=user_id,
             chapter_id=chapter_id,
@@ -115,8 +138,30 @@ def submit_argument(
             paste_count=request.paste_count,
         )
     )
-    outcome = result.outcome
-    obs_metrics.submissions_counter.add(1, {"verdict": outcome.verdict.value})
+    return PendingSubmissionResponse(
+        submission_id=pending.submission_id,
+        attempt_number=pending.attempt_number,
+        status=SubmissionStatus.EVALUATING,
+    )
+
+
+@polling_router.get("/{submission_id}")
+def get_submission(
+    submission_id: uuid.UUID,
+    user_id: CurrentUserId,
+    use_case: GetUseCase,
+) -> SubmissionStateResponse:
+    view = use_case.execute(user_id, submission_id)
+    return SubmissionStateResponse(
+        submission_id=view.submission_id,
+        chapter_id=view.chapter_id,
+        attempt_number=view.attempt_number,
+        status=view.status,
+        result=None if view.result is None else _correction_response(view.result),
+    )
+
+
+def _correction_response(view: CorrectionView) -> CorrectionResponse:
     annotations = [
         AnnotationResponse(
             span_start=a.span_start,
@@ -127,16 +172,14 @@ def submit_argument(
             suggestion=a.suggestion,
             priority=a.priority,
         )
-        for a in outcome.annotations
+        for a in view.annotations
     ]
-    return SubmissionResponse(
-        submission_id=result.submission_id,
-        attempt_number=result.attempt_number,
-        verdict=outcome.verdict,
-        average_score=round(outcome.average_score, 2),
-        floor_value=result.ruler.dimension_floor,
-        min_average=result.ruler.min_average,
-        chapter_status=result.chapter_status,
+    return CorrectionResponse(
+        verdict=view.verdict,
+        average_score=round(view.average_score, 2),
+        floor_value=view.floor_value,
+        min_average=view.min_average,
+        chapter_status=view.chapter_status,
         scores=[
             ScoreResponse(
                 dimension=s.dimension,
@@ -144,13 +187,13 @@ def submit_argument(
                 evidence=s.evidence,
                 passed_floor=s.passed_floor,
             )
-            for s in outcome.scores
+            for s in view.scores
         ],
         annotations=annotations,
         para_passar=sorted((a for a in annotations if a.priority <= 3), key=lambda a: a.priority),
         lens=LensResponse(
-            exam=result.lens.exam,
-            version=result.lens.version,
+            exam=view.lens.exam,
+            version=view.lens.version,
             criteria=[
                 LensCriterionResponse(
                     code=criterion.code,
@@ -159,11 +202,11 @@ def submit_argument(
                     scale_max=criterion.scale_max,
                     is_argumenta_extra=criterion.is_argumenta_extra,
                 )
-                for criterion in result.lens.criteria
+                for criterion in view.lens.criteria
             ],
-            total=result.lens.total,
-            total_max=result.lens.total_max,
-            scale_source=result.lens.scale_source,
+            total=view.lens.total,
+            total_max=view.lens.total_max,
+            scale_source=view.lens.scale_source,
         ),
     )
 

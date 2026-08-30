@@ -7,6 +7,7 @@ from argumenta.domain.errors import ChapterNotWritableError
 from argumenta.domain.submission import (
     count_words,
     next_status_for,
+    resolve_status_after_evaluation,
     submission_context_for,
 )
 
@@ -37,6 +38,28 @@ class TestVerdictTransitions:
 
     def test_persuasion_failure_opens_the_consequence(self) -> None:
         assert next_status_for(Verdict.FAILED_PERSUASION) == ChapterStatus.IN_CONSEQUENCE
+
+
+class TestStatusAfterEvaluation:
+    """With async evaluation two submissions can be in flight: a verdict that
+    lands AFTER the chapter passed must never regress it."""
+
+    @pytest.mark.parametrize(
+        "verdict",
+        [Verdict.APPROVED, Verdict.FAILED_TECHNICAL, Verdict.FAILED_PERSUASION],
+    )
+    def test_passed_is_final_whatever_the_late_verdict_says(self, verdict: Verdict) -> None:
+        assert (
+            resolve_status_after_evaluation(ChapterStatus.PASSED, verdict) == ChapterStatus.PASSED
+        )
+
+    @pytest.mark.parametrize(
+        "current",
+        [ChapterStatus.AVAILABLE, ChapterStatus.DRAFTING, ChapterStatus.IN_RECOVERY],
+    )
+    def test_otherwise_the_verdict_rules(self, current: ChapterStatus) -> None:
+        for verdict in Verdict:
+            assert resolve_status_after_evaluation(current, verdict) == next_status_for(verdict)
 
 
 def test_count_words_splits_on_whitespace() -> None:

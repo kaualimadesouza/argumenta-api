@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 from tests.integration.conftest import ScriptedEngine
+from tests.integration.conftest import submit_and_correction as _correction
 from tests.integration.conftest import submit_text as _submit
 
 from argumenta.adapters.db.models import Chapter, ChapterProgress, Submission
@@ -42,7 +43,7 @@ class TestStartRecoveryRule:
 
 def _fail_persuasion(client: TestClient, chapter_id: uuid.UUID, engine: ScriptedEngine) -> None:
     engine.scripted = "failed_persuasion"
-    assert _submit(client, chapter_id).status_code == 201
+    assert _submit(client, chapter_id).status_code == 202
 
 
 class TestRecoveryFlow:
@@ -102,7 +103,7 @@ class TestRecoveryFlow:
         client.post(f"/chapters/{chapter_id}/recovery")
         engine_double.scripted = "approved"
 
-        assert _submit(client, chapter_id).status_code == 201
+        assert _submit(client, chapter_id).status_code == 202
 
         with Session(db_engine) as session:
             contexts = list(
@@ -124,9 +125,9 @@ class TestRecoveryFlow:
         assert client.post(f"/chapters/{chapter_id}/recovery").status_code == 200
 
         engine_double.scripted = "approved"
-        body = _submit(client, chapter_id).json()
-        assert body["verdict"] == "approved"
-        assert body["chapter_status"] == "passed"
+        body = _correction(client, chapter_id)
+        assert body["result"]["verdict"] == "approved"
+        assert body["result"]["chapter_status"] == "passed"
 
         # reading the track materializes the next chapter of the story
         assert client.get("/track").status_code == 200

@@ -2,7 +2,6 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from mangum import Mangum
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from argumenta import __version__
@@ -17,6 +16,7 @@ from argumenta.presentation.fastapi.me import router as me_router
 from argumenta.presentation.fastapi.progress import router as progress_router
 from argumenta.presentation.fastapi.reactions import router as reactions_router
 from argumenta.presentation.fastapi.request_id import RequestIdMiddleware
+from argumenta.presentation.fastapi.submissions import polling_router
 from argumenta.presentation.fastapi.submissions import router as submissions_router
 from argumenta.presentation.fastapi.telemetry import router as telemetry_router
 from argumenta.presentation.fastapi.track import router as track_router
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(track_router)
     app.include_router(progress_router)
     app.include_router(submissions_router)
+    app.include_router(polling_router)
     app.include_router(reactions_router)
     app.include_router(telemetry_router)
 
@@ -81,5 +82,3 @@ configure_logging()
 configure_telemetry(get_settings())
 
 app = create_app()
-
-handler = Mangum(app)

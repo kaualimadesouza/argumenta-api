@@ -76,7 +76,7 @@ class TestSeries:
         self, game: tuple[TestClient, uuid.UUID]
     ) -> None:
         client, chapter_id = game
-        assert submit_text(client, chapter_id).status_code == 201
+        assert submit_text(client, chapter_id).status_code == 202
 
         body = client.get("/progress").json()
 
@@ -90,7 +90,7 @@ class TestSeries:
         self, game: tuple[TestClient, uuid.UUID], db_engine: Engine
     ) -> None:
         client, chapter_id = game
-        assert submit_text(client, chapter_id).status_code == 201
+        assert submit_text(client, chapter_id).status_code == 202
         _age_submissions(db_engine, days=40)
 
         body = client.get("/progress").json()
@@ -102,7 +102,7 @@ class TestSeries:
     ) -> None:
         client, boss_chapter_id = boss_game
         before = client.get("/progress").json()
-        assert submit_text(client, boss_chapter_id, body=BOSS_TEXT).status_code == 201
+        assert submit_text(client, boss_chapter_id, body=BOSS_TEXT).status_code == 202
 
         after = client.get("/progress").json()
 
@@ -140,7 +140,7 @@ class TestMilestones:
     ) -> None:
         client, boss_chapter_id = boss_game
         engine_double.scripted = "approved"
-        assert submit_text(client, boss_chapter_id, body=BOSS_TEXT).status_code == 201
+        assert submit_text(client, boss_chapter_id, body=BOSS_TEXT).status_code == 202
 
         body = client.get("/progress").json()
 
