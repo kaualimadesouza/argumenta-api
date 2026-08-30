@@ -20,6 +20,7 @@ from argumenta.adapters.db.models import (
 from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.gameplay.ports import (
     NewSubmission,
+    PastAttempt,
     PendingSubmission,
     StoredCorrection,
     SubmissionRecord,
@@ -198,6 +199,54 @@ class SqlAlchemySubmissionRepository:
             .where(Submission.id == submission_id, Submission.deleted_at.is_(None))
             .values(status=status)
         )
+
+    def list_attempts(self, user_id: uuid.UUID, chapter_id: uuid.UUID) -> tuple[PastAttempt, ...]:
+        rows = self._session.execute(
+            select(Submission, Evaluation, Chapter.kind)
+            .join(Evaluation, Evaluation.submission_id == Submission.id)
+            .join(Chapter, Submission.chapter_id == Chapter.id)
+            .where(
+                Submission.user_id == user_id,
+                Submission.chapter_id == chapter_id,
+                Submission.deleted_at.is_(None),
+                Evaluation.is_current.is_(True),
+                Evaluation.deleted_at.is_(None),
+            )
+            .order_by(Submission.attempt_number.desc())
+        ).all()
+
+        results = []
+        for submission, evaluation, chapter_kind in rows:
+            scores = tuple(
+                ScoredDimension(
+                    dimension=score.dimension,
+                    score=score.score,
+                    evidence=score.evidence,
+                    passed_floor=score.passed_floor,
+                )
+                for score in self._session.scalars(
+                    select(EvaluationScore).where(
+                        EvaluationScore.evaluation_id == evaluation.id,
+                        EvaluationScore.deleted_at.is_(None),
+                    )
+                )
+            )
+            results.append(
+                PastAttempt(
+                    submission_id=submission.id,
+                    attempt_number=submission.attempt_number,
+                    body=submission.text,
+                    verdict=evaluation.verdict,
+                    average_score=float(evaluation.average_score),
+                    floor_value=evaluation.floor_value,
+                    min_average=evaluation.min_average,
+                    scores=scores,
+                    exam=evaluation.exam,
+                    chapter_kind=chapter_kind,
+                    submitted_at=submission.created_at,
+                )
+            )
+        return tuple(results)
 
     def get_correction(self, submission_id: uuid.UUID) -> StoredCorrection | None:
         row = self._session.execute(

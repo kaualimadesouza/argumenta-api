@@ -6,6 +6,9 @@ from argumenta.application.gameplay.use_cases.get_submission import (
     GetSubmissionUseCase,
     SubmissionView,
 )
+from argumenta.application.gameplay.use_cases.get_submission_history import (
+    GetSubmissionHistoryUseCase,
+)
 from argumenta.application.gameplay.use_cases.record_evaluation_failure import (
     RecordEvaluationFailureUseCase,
 )
@@ -19,6 +22,7 @@ from argumenta.application.gameplay.use_cases.submit_argument import (
 __all__ = [
     "CorrectionView",
     "EvaluateSubmissionUseCase",
+    "GetSubmissionHistoryUseCase",
     "GetSubmissionUseCase",
     "RecordEvaluationFailureUseCase",
     "SaveDraftUseCase",

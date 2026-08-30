@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -7,11 +8,13 @@ from pydantic import BaseModel, Field
 from argumenta.application.gameplay.ports import DraftRepository, ProgressWriter
 from argumenta.application.gameplay.use_cases import (
     CorrectionView,
+    GetSubmissionHistoryUseCase,
     GetSubmissionUseCase,
     SaveDraftUseCase,
     SubmitArgument,
     SubmitArgumentUseCase,
 )
+from argumenta.application.track.ports import ContentRepository, ProgressRepository
 from argumenta.domain.enums import (
     AnnotationType,
     ChapterStatus,
@@ -24,8 +27,11 @@ from argumenta.domain.enums import (
 from argumenta.domain.lenses import ScaleSource
 from argumenta.presentation.fastapi.dependencies import (
     CurrentUserId,
+    get_content_repository,
     get_draft_repository,
+    get_get_submission_history_use_case,
     get_get_submission_use_case,
+    get_progress_repository,
     get_progress_writer,
     get_submit_argument_use_case,
 )
@@ -37,6 +43,11 @@ Progress = Annotated[ProgressWriter, Depends(get_progress_writer)]
 Drafts = Annotated[DraftRepository, Depends(get_draft_repository)]
 SubmitUseCase = Annotated[SubmitArgumentUseCase, Depends(get_submit_argument_use_case)]
 GetUseCase = Annotated[GetSubmissionUseCase, Depends(get_get_submission_use_case)]
+Content = Annotated[ContentRepository, Depends(get_content_repository)]
+TrackProgress = Annotated[ProgressRepository, Depends(get_progress_repository)]
+GetHistoryUseCase = Annotated[
+    GetSubmissionHistoryUseCase, Depends(get_get_submission_history_use_case)
+]
 
 
 class SubmissionRequest(BaseModel):
@@ -116,6 +127,19 @@ class SubmissionStateResponse(BaseModel):
     attempt_number: int
     status: SubmissionStatus
     result: CorrectionResponse | None
+
+
+class PastSubmissionResponse(BaseModel):
+    submission_id: uuid.UUID
+    attempt_number: int
+    body: str
+    verdict: Verdict
+    average_score: float
+    floor_value: int
+    min_average: int
+    scores: list[ScoreResponse]
+    lens: LensResponse
+    created_at: datetime
 
 
 class DraftRequest(BaseModel):
@@ -209,6 +233,54 @@ def _correction_response(view: CorrectionView) -> CorrectionResponse:
             scale_source=view.lens.scale_source,
         ),
     )
+
+
+@router.get("/{chapter_id}/submissions")
+def get_submission_history(
+    chapter_id: uuid.UUID,
+    user_id: CurrentUserId,
+    use_case: GetHistoryUseCase,
+) -> list[PastSubmissionResponse]:
+    attempts = use_case.execute(user_id, chapter_id)
+    return [
+        PastSubmissionResponse(
+            submission_id=a.submission_id,
+            attempt_number=a.attempt_number,
+            body=a.body,
+            verdict=a.verdict,
+            average_score=round(a.average_score, 2),
+            floor_value=a.floor_value,
+            min_average=a.min_average,
+            scores=[
+                ScoreResponse(
+                    dimension=s.dimension,
+                    score=s.score,
+                    evidence=s.evidence,
+                    passed_floor=s.passed_floor,
+                )
+                for s in a.scores
+            ],
+            lens=LensResponse(
+                exam=a.lens.exam,
+                version=a.lens.version,
+                criteria=[
+                    LensCriterionResponse(
+                        code=c.code,
+                        label=c.label,
+                        score=c.score,
+                        scale_max=c.scale_max,
+                        is_argumenta_extra=c.is_argumenta_extra,
+                    )
+                    for c in a.lens.criteria
+                ],
+                total=a.lens.total,
+                total_max=a.lens.total_max,
+                scale_source=a.lens.scale_source,
+            ),
+            created_at=a.created_at.replace(tzinfo=UTC),
+        )
+        for a in attempts
+    ]
 
 
 @router.put("/{chapter_id}/draft", status_code=204)

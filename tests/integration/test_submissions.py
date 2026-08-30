@@ -291,3 +291,56 @@ class TestSubmissionLgpd:
         assert response.status_code == 202
         assert marker not in caplog.text
         assert "aluno@example.com" not in caplog.text
+
+
+class TestSubmissionHistory:
+    def test_get_submissions_returns_all_attempts_newest_first(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        engine_double: ScriptedEngine,
+    ) -> None:
+        client, chapter_id = game
+
+        # Primeira tentativa falha
+        engine_double.scripted = "failed_technical"
+        _correction(client, chapter_id)
+
+        # Capítulo em recuperação
+        client.post(f"/chapters/{chapter_id}/recover")
+
+        # Segunda tentativa falha
+        engine_double.scripted = "failed_persuasion"
+        _correction(client, chapter_id)
+
+        response = client.get(f"/chapters/{chapter_id}/submissions")
+        assert response.status_code == 200
+        submissions = response.json()
+
+        assert len(submissions) == 2
+        assert submissions[0]["attempt_number"] == 2
+        assert submissions[0]["verdict"] == "failed_persuasion"
+        assert submissions[0]["lens"]["exam"] == "fuvest"
+
+        assert submissions[1]["attempt_number"] == 1
+        assert submissions[1]["verdict"] == "failed_technical"
+
+    def test_get_submissions_empty_if_no_attempts(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+    ) -> None:
+        client, chapter_id = game
+        response = client.get(f"/chapters/{chapter_id}/submissions")
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_get_submissions_for_locked_chapter_returns_404(
+        self,
+        game: tuple[TestClient, uuid.UUID],
+        db_engine: Engine,
+    ) -> None:
+        client, _ = game
+        with Session(db_engine) as session:
+            locked_id = session.scalar(select(Chapter.id).where(Chapter.position == 2))
+
+        response = client.get(f"/chapters/{locked_id}/submissions")
+        assert response.status_code == 404
