@@ -2,18 +2,28 @@
 client so it runs on every PR. The request shape is where Sonnet 5 breaks a
 caller: a non-default temperature is a 400, and thinking comes out of max_tokens."""
 
+import dataclasses
 from typing import Any
 
 import anthropic
 import pytest
 from anthropic.types import Message, StopReason, TextBlock, ToolUseBlock, Usage
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from tests.otel_helpers import counter_points, histogram_points, point_attributes
 
+from argumenta.adapters.llm import evaluation_engine as evaluation_engine_module
 from argumenta.adapters.llm.anthropic_provider import AnthropicProvider
 from argumenta.adapters.llm.contract import ensure_usable
 from argumenta.adapters.llm.evaluation_engine import LlmEvaluationEngine
+from argumenta.adapters.llm.prompts.evaluation_v1 import PROMPT_VERSION as EVALUATION_PROMPT_VERSION
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
 from argumenta.adapters.llm.reaction_engine import LlmReactionEngine
 from argumenta.adapters.llm.usage import billed_input_tokens
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.evaluation.ports import EngineRequest
 from argumenta.application.reactions.ports import ReactionRequest
 from argumenta.domain.enums import Dimension, Verdict
@@ -371,3 +381,123 @@ class TestBilledInputTokens:
 
     def test_a_response_without_caching_counts_only_the_prompt(self) -> None:
         assert billed_input_tokens(Usage(input_tokens=100, output_tokens=20)) == 100
+
+
+class TestEvaluationTelemetry:
+    """Issue #51: the evaluation span and the token/latency metrics, both wired
+    where the engine already knows model, prompt_version and tokens."""
+
+    def _tracing(self) -> tuple[Any, InMemorySpanExporter]:
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        return provider.get_tracer("test"), exporter
+
+    def _metrics(self) -> tuple[Any, Any, InMemoryMetricReader]:
+        reader = InMemoryMetricReader()
+        meter = MeterProvider(metric_readers=[reader]).get_meter("test")
+        return (
+            meter.create_histogram("argumenta.evaluation.latency"),
+            meter.create_counter("argumenta.llm.tokens"),
+            reader,
+        )
+
+    def test_the_evaluation_span_carries_model_tokens_and_prompt_version(
+        self, fake_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_client(_tool_response())
+        tracer, exporter = self._tracing()
+        monkeypatch.setattr(evaluation_engine_module, "_tracer", tracer)
+
+        _evaluation().evaluate(_engine_request())
+
+        spans = exporter.get_finished_spans()
+        assert len(spans) == 1
+        attributes = spans[0].attributes
+        assert attributes is not None
+        assert attributes["llm.model"] == "claude-sonnet-5"
+        assert attributes["argumenta.prompt_version"] == EVALUATION_PROMPT_VERSION
+        assert attributes["llm.usage.input_tokens"] == 1200
+        assert attributes["llm.usage.output_tokens"] == 400
+
+    def test_tokens_are_counted_by_direction_and_engine(
+        self, fake_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_client(_tool_response())
+        histogram, counter, reader = self._metrics()
+        monkeypatch.setattr(obs_metrics, "evaluation_latency", histogram)
+        monkeypatch.setattr(obs_metrics, "tokens_counter", counter)
+
+        _evaluation().evaluate(_engine_request())
+
+        points = {
+            (
+                point_attributes(point).get("direction"),
+                point_attributes(point).get("engine"),
+            ): point.value
+            for point in counter_points(reader.get_metrics_data(), "argumenta.llm.tokens")
+        }
+        assert points[("input", "evaluation")] == 1200
+        assert points[("output", "evaluation")] == 400
+
+    def test_the_latency_histogram_records_one_value(
+        self, fake_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_client(_tool_response())
+        histogram, counter, reader = self._metrics()
+        monkeypatch.setattr(obs_metrics, "evaluation_latency", histogram)
+        monkeypatch.setattr(obs_metrics, "tokens_counter", counter)
+
+        _evaluation().evaluate(_engine_request())
+
+        points = histogram_points(reader.get_metrics_data(), "argumenta.evaluation.latency")
+        assert len(points) == 1
+        assert points[0].count == 1
+
+
+class TestReactionTelemetry:
+    def test_tokens_are_counted_tagged_as_the_reaction_engine(
+        self, fake_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_client(_text_response())
+        reader = InMemoryMetricReader()
+        counter = (
+            MeterProvider(metric_readers=[reader])
+            .get_meter("test")
+            .create_counter("argumenta.llm.tokens")
+        )
+        monkeypatch.setattr(obs_metrics, "tokens_counter", counter)
+
+        _reaction().generate(_reaction_request())
+
+        points = {
+            (
+                point_attributes(point).get("direction"),
+                point_attributes(point).get("engine"),
+            ): point.value
+            for point in counter_points(reader.get_metrics_data(), "argumenta.llm.tokens")
+        }
+        assert points[("input", "reaction")] == 900
+        assert points[("output", "reaction")] == 42
+
+
+class TestEvaluationTelemetryLgpd:
+    """Issue #51 acceptance criterion: no student text in a span attribute."""
+
+    def test_the_span_never_carries_the_students_essay(
+        self, fake_client: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_client(_tool_response())
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        monkeypatch.setattr(evaluation_engine_module, "_tracer", provider.get_tracer("test"))
+        marker = "aluno-marcador-unico-9x7z"
+        request = dataclasses.replace(_engine_request(), text=f"{marker} {_engine_request().text}")
+
+        _evaluation().evaluate(request)
+
+        span = exporter.get_finished_spans()[0]
+        assert span.attributes is not None
+        for value in span.attributes.values():
+            assert marker not in str(value)

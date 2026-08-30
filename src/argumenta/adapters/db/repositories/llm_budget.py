@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from argumenta.adapters.db.models import CharacterReaction, Evaluation
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain.errors import LlmBudgetExceededError
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class SqlLlmBudget:
         if self._budget <= 0:
             return
         spent = self._spent_this_month()
+        obs_metrics.budget_used_ratio.record(spent / self._budget)
         if spent >= self._budget:
             logger.error("llm budget exhausted: %s of %s tokens this month", spent, self._budget)
             raise LlmBudgetExceededError(

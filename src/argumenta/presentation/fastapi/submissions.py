@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.gameplay.ports import DraftRepository, ProgressWriter
 from argumenta.application.gameplay.use_cases import (
     SaveDraftUseCase,
@@ -115,6 +116,7 @@ def submit_argument(
         )
     )
     outcome = result.outcome
+    obs_metrics.submissions_counter.add(1, {"verdict": outcome.verdict.value})
     annotations = [
         AnnotationResponse(
             span_start=a.span_start,

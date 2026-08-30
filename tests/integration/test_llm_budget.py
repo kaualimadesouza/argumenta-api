@@ -2,8 +2,11 @@ import logging
 import uuid
 
 import pytest
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+from tests.otel_helpers import histogram_points
 
 from argumenta.adapters.db.models import (
     Chapter,
@@ -14,6 +17,7 @@ from argumenta.adapters.db.models import (
     User,
 )
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain.enums import (
     ChapterKind,
     ContentStatus,
@@ -104,3 +108,24 @@ def test_zero_budget_disables_the_guard(db_engine: Engine) -> None:
     with Session(db_engine) as session:
         _seed_evaluation(session, input_tokens=10_000, output_tokens=10_000)
         SqlLlmBudget(session, monthly_token_budget=0).ensure_within_budget()
+
+
+def test_the_check_records_the_used_ratio_as_a_metric(
+    db_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #51: the metric that feeds the budget-alert of issue #52, alongside
+    the log line above (kept for now, since #52 is not wired yet)."""
+    reader = InMemoryMetricReader()
+    histogram = (
+        MeterProvider(metric_readers=[reader])
+        .get_meter("test")
+        .create_histogram("argumenta.llm.budget_used_ratio")
+    )
+    monkeypatch.setattr(obs_metrics, "budget_used_ratio", histogram)
+    with Session(db_engine) as session:
+        _seed_evaluation(session, input_tokens=500, output_tokens=0)
+        SqlLlmBudget(session, monthly_token_budget=1000).ensure_within_budget()
+
+    points = histogram_points(reader.get_metrics_data(), "argumenta.llm.budget_used_ratio")
+    assert len(points) == 1
+    assert points[0].sum == pytest.approx(0.5)

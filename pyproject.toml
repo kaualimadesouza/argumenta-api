@@ -18,6 +18,11 @@ dependencies = [
     "anthropic>=0.40",
     "spylls>=0.1.7",
     "mangum>=0.22.0",
+    "opentelemetry-sdk>=1.44.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
+    "opentelemetry-instrumentation-httpx>=0.65b0",
 ]
 
 [project.optional-dependencies]

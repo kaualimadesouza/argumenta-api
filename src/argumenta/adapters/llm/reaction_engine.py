@@ -8,6 +8,7 @@ from argumenta.adapters.llm.prompts.reaction_v1 import (
 )
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
 from argumenta.adapters.llm.provider import LlmCall, LlmProvider
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.reactions.ports import ReactionRequest, ReactionText
 from argumenta.domain.enums import Verdict
 
@@ -44,6 +45,12 @@ class LlmReactionEngine:
                 max_tokens=self._max_tokens,
                 effort=self._effort,
             )
+        )
+        obs_metrics.tokens_counter.add(
+            reply.usage.input_tokens or 0, {"engine": "reaction", "direction": "input"}
+        )
+        obs_metrics.tokens_counter.add(
+            reply.usage.output_tokens or 0, {"engine": "reaction", "direction": "output"}
         )
         return ReactionText(
             body=reply.body,

@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from argumenta.adapters.llm.effort import Effort
@@ -67,6 +68,13 @@ class Settings(BaseSettings):
     # hard transport cap, checked before the body is parsed: a 60 MB request
     # would otherwise cost hundreds of megabytes of RSS to reject
     max_request_bytes: int = 1_000_000
+
+    # observability (issue #51): OTLP is vendor-neutral, so the backend (SigNoz
+    # local for now) is just where this endpoint points. The unprefixed alias
+    # matches the standard OTel env var; unset keeps tracing/metrics no-op
+    otel_exporter_otlp_endpoint: str | None = Field(
+        default=None, validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT"
+    )
 
 
 def get_settings() -> Settings:

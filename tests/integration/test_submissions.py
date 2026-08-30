@@ -2,13 +2,18 @@
 derived from the acceptance criteria of issue #8. Shared fixtures (game,
 engine_double, ScriptedEngine, submit_text) live in conftest.py."""
 
+import logging
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 from tests.integration.conftest import ScriptedEngine
 from tests.integration.conftest import submit_text as _submit
+from tests.otel_helpers import counter_points, point_attributes
 
 from argumenta.adapters.db.models import (
     Chapter,
@@ -18,6 +23,7 @@ from argumenta.adapters.db.models import (
     Evaluation,
     Submission,
 )
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain.enums import ChapterStatus
 
 
@@ -243,3 +249,46 @@ class TestDraftAutosave:
         response = client.put(f"/chapters/{locked_id}/draft", json={"body": "x"})
 
         assert response.status_code == 409
+
+
+class TestSubmissionTelemetry:
+    """Issue #51: the counter that feeds the 'submissions by verdict' dashboard."""
+
+    def test_a_submission_increments_the_counter_by_its_verdict(
+        self, game: tuple[TestClient, uuid.UUID], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        client, chapter_id = game
+        reader = InMemoryMetricReader()
+        counter = (
+            MeterProvider(metric_readers=[reader])
+            .get_meter("test")
+            .create_counter("argumenta.submissions")
+        )
+        monkeypatch.setattr(obs_metrics, "submissions_counter", counter)
+
+        response = _submit(client, chapter_id)
+
+        assert response.status_code == 201
+        points = counter_points(reader.get_metrics_data(), "argumenta.submissions")
+        assert len(points) == 1
+        assert points[0].value == 1
+        assert point_attributes(points[0])["verdict"] == "approved"
+
+
+class TestSubmissionLgpd:
+    """Issue #51 acceptance criterion: no student text, e-mail or session token
+    in any log line, span or metric produced while grading a submission."""
+
+    def test_no_log_line_carries_the_students_essay_or_email(
+        self, game: tuple[TestClient, uuid.UUID], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        client, chapter_id = game
+        marker = "aluno-marcador-unico-lgpd-7f3k"
+        body = f"{marker} " + " ".join(["palavra"] * 130)
+
+        with caplog.at_level(logging.INFO):
+            response = _submit(client, chapter_id, body=body)
+
+        assert response.status_code == 201
+        assert marker not in caplog.text
+        assert "aluno@example.com" not in caplog.text
