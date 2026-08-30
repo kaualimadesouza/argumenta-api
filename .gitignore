@@ -27,3 +27,4 @@ infrastructure/crash.log
 
 # board dumps from `gh project item-list`, never part of the source
 project_items.json
+signoz/data/
