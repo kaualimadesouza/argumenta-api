@@ -76,6 +76,15 @@ class Settings(BaseSettings):
         default=None, validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT"
     )
 
+    # async evaluation (issue #68): AWS injects the function name, and its
+    # presence is what switches the dispatcher from inline to self-invoke
+    lambda_function_name: str | None = Field(
+        default=None, validation_alias="AWS_LAMBDA_FUNCTION_NAME"
+    )
+    # a submission evaluating past this is reported failed to the client
+    # (worker timeout is 120s; a very late verdict can still land afterwards)
+    evaluation_stale_after_seconds: int = 180
+
 
 def get_settings() -> Settings:
     return Settings()

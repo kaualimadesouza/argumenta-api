@@ -44,6 +44,15 @@ class SubmissionContext(enum.StrEnum):
     RECOVERY = "recovery"
 
 
+class SubmissionStatus(enum.StrEnum):
+    """Lifecycle of an async correction: failed is recoverable (the student may
+    resubmit at no daily-limit cost), evaluated is final."""
+
+    EVALUATING = "evaluating"
+    EVALUATED = "evaluated"
+    FAILED = "failed"
+
+
 class Verdict(enum.StrEnum):
     APPROVED = "approved"
     FAILED_TECHNICAL = "failed_technical"

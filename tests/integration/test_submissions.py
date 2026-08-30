@@ -12,6 +12,7 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 from tests.integration.conftest import ScriptedEngine
+from tests.integration.conftest import submit_and_correction as _correction
 from tests.integration.conftest import submit_text as _submit
 from tests.otel_helpers import counter_points, point_attributes
 
@@ -33,12 +34,10 @@ class TestStateTransitions:
     ) -> None:
         client, chapter_id = game
 
-        response = _submit(client, chapter_id)
+        body = _correction(client, chapter_id)
 
-        assert response.status_code == 201, response.text
-        body = response.json()
-        assert body["verdict"] == "approved"
-        assert body["chapter_status"] == "passed"
+        assert body["result"]["verdict"] == "approved"
+        assert body["result"]["chapter_status"] == "passed"
         with Session(db_engine) as session:
             progress = session.scalar(
                 select(ChapterProgress).where(ChapterProgress.chapter_id == chapter_id)
@@ -57,10 +56,10 @@ class TestStateTransitions:
         client, chapter_id = game
         engine_double.scripted = "failed_technical"
 
-        body = _submit(client, chapter_id).json()
+        body = _correction(client, chapter_id)
 
-        assert body["verdict"] == "failed_technical"
-        assert body["chapter_status"] == "drafting"
+        assert body["result"]["verdict"] == "failed_technical"
+        assert body["result"]["chapter_status"] == "drafting"
         with Session(db_engine) as session:
             status = session.scalar(
                 select(ChapterProgress.status).where(ChapterProgress.chapter_id == chapter_id)
@@ -75,10 +74,10 @@ class TestStateTransitions:
         client, chapter_id = game
         engine_double.scripted = "failed_persuasion"
 
-        body = _submit(client, chapter_id).json()
+        body = _correction(client, chapter_id)
 
-        assert body["verdict"] == "failed_persuasion"
-        assert body["chapter_status"] == "in_consequence"
+        assert body["result"]["verdict"] == "failed_persuasion"
+        assert body["result"]["chapter_status"] == "in_consequence"
         # the chapter now serves the consequence script
         assert client.get(f"/chapters/{chapter_id}").json()["branch"] == "consequence"
 
@@ -93,7 +92,7 @@ class TestDailyLimit:
         engine_double.scripted = "failed_technical"
 
         for _ in range(3):
-            assert _submit(client, chapter_id).status_code == 201
+            assert _submit(client, chapter_id).status_code == 202
         blocked = _submit(client, chapter_id)
 
         assert blocked.status_code == 429
@@ -177,7 +176,7 @@ class TestPersistence:
 
     def test_passed_chapter_rejects_resubmission(self, game: tuple[TestClient, uuid.UUID]) -> None:
         client, chapter_id = game
-        assert _submit(client, chapter_id).status_code == 201
+        assert _submit(client, chapter_id).status_code == 202
 
         assert _submit(client, chapter_id).status_code == 409
 
@@ -188,23 +187,23 @@ class TestCorrectionResponse:
     ) -> None:
         client, chapter_id = game
 
-        body = _submit(client, chapter_id).json()
+        result = _correction(client, chapter_id)["result"]
 
-        assert {s["dimension"] for s in body["scores"]} == {
+        assert {s["dimension"] for s in result["scores"]} == {
             "norma_culta",
             "coesao",
             "coerencia",
             "repertorio",
             "persuasao",
         }
-        for score in body["scores"]:
+        for score in result["scores"]:
             assert score["evidence"]
             assert score["passed_floor"] is True
-        assert body["floor_value"] == 40
-        assert body["min_average"] == 50
-        assert body["average_score"] == 80
-        assert body["annotations"] == []
-        assert body["para_passar"] == []
+        assert result["floor_value"] == 40
+        assert result["min_average"] == 50
+        assert result["average_score"] == 80
+        assert result["annotations"] == []
+        assert result["para_passar"] == []
 
 
 class TestDraftAutosave:
@@ -233,7 +232,7 @@ class TestDraftAutosave:
         client, chapter_id = game
         client.put(f"/chapters/{chapter_id}/draft", json={"body": "quase la"})
 
-        assert _submit(client, chapter_id).status_code == 201
+        assert _submit(client, chapter_id).status_code == 202
 
         with Session(db_engine) as session:
             draft = session.scalars(select(Draft)).one()
@@ -268,7 +267,7 @@ class TestSubmissionTelemetry:
 
         response = _submit(client, chapter_id)
 
-        assert response.status_code == 201
+        assert response.status_code == 202
         points = counter_points(reader.get_metrics_data(), "argumenta.submissions")
         assert len(points) == 1
         assert points[0].value == 1
@@ -289,6 +288,6 @@ class TestSubmissionLgpd:
         with caplog.at_level(logging.INFO):
             response = _submit(client, chapter_id, body=body)
 
-        assert response.status_code == 201
+        assert response.status_code == 202
         assert marker not in caplog.text
         assert "aluno@example.com" not in caplog.text

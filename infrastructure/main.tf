@@ -27,7 +27,9 @@ resource "aws_lambda_function" "api" {
   image_uri     = var.image_uri
   architectures = ["x86_64"]
   memory_size   = 512
-  timeout       = 30
+  # budget for the async evaluation leg (self-invoke, issue #68); the HTTP leg
+  # answers in <2s and API Gateway's hard 30s cap no longer constrains anything
+  timeout       = 120
 
   environment {
     variables = {
@@ -43,6 +45,20 @@ resource "aws_lambda_function" "api" {
       ARGUMENTA_REACTION_MODEL       = var.argumenta_reaction_model
     }
   }
+}
+
+# the evaluation runs as an async self-invoke of this same function (issue #68)
+data "aws_iam_policy_document" "self_invoke" {
+  statement {
+    actions   = ["lambda:InvokeFunction"]
+    resources = [aws_lambda_function.api.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "api_self_invoke" {
+  name   = "argumenta-api-${var.stage}-self-invoke"
+  role   = aws_iam_role.api.id
+  policy = data.aws_iam_policy_document.self_invoke.json
 }
 
 resource "aws_apigatewayv2_api" "api" {

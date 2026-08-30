@@ -167,6 +167,19 @@ def submit_text(client: TestClient, chapter_id: uuid.UUID, body: str = TEXT_130_
     return client.post(f"/chapters/{chapter_id}/submissions", json={"body": body})
 
 
+def submit_and_correction(
+    client: TestClient, chapter_id: uuid.UUID, body: str = TEXT_130_WORDS
+) -> Any:
+    """POST + polling GET collapsed into one step: with the inline dispatcher
+    the verdict is ready by the time the 202 returns. Returns the GET body,
+    with the correction under "result"."""
+    accepted = submit_text(client, chapter_id, body)
+    assert accepted.status_code == 202, accepted.text
+    state = client.get(f"/submissions/{accepted.json()['submission_id']}")
+    assert state.status_code == 200, state.text
+    return state.json()
+
+
 @pytest.fixture
 def boss_game(
     game: tuple[TestClient, uuid.UUID],
@@ -178,7 +191,7 @@ def boss_game(
     client, chapter_id = game
     engine_double.scripted = "approved"
     for position in (1, 2):
-        assert submit_text(client, chapter_id).status_code == 201
+        assert submit_text(client, chapter_id).status_code == 202
         assert client.get("/track").status_code == 200
         with Session(db_engine) as session:
             next_id = session.scalar(select(Chapter.id).where(Chapter.position == position + 1))

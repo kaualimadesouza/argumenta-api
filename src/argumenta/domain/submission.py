@@ -48,6 +48,14 @@ def next_status_for(verdict: Verdict) -> ChapterStatus:
     return ChapterStatus.IN_CONSEQUENCE
 
 
+def resolve_status_after_evaluation(current: ChapterStatus, verdict: Verdict) -> ChapterStatus:
+    """Async evaluation can land after the chapter already passed (two
+    submissions in flight); passed is final, a late verdict never regresses."""
+    if current == ChapterStatus.PASSED:
+        return ChapterStatus.PASSED
+    return next_status_for(verdict)
+
+
 def count_words(text: str) -> int:
     return len(text.split())
 

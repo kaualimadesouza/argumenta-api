@@ -24,6 +24,7 @@ from argumenta.domain.enums import (
     ReactionBeat,
     Severity,
     SubmissionContext,
+    SubmissionStatus,
     Verdict,
 )
 
@@ -49,6 +50,13 @@ class Submission(UuidPkMixin, AuditMixin, Base):
         UUID(as_uuid=True), ForeignKey("chapters.id", ondelete="RESTRICT"), nullable=False
     )
     attempt_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    status: Mapped[SubmissionStatus] = mapped_column(
+        db_enum(SubmissionStatus, "submission_status"),
+        # backfill default: every row created before async evaluation already
+        # carries its evaluation (a timed-out sync request rolled back entirely)
+        server_default=SubmissionStatus.EVALUATED.value,
+        nullable=False,
+    )
     context: Mapped[SubmissionContext] = mapped_column(
         db_enum(SubmissionContext, "submission_context"), nullable=False
     )

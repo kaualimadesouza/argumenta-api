@@ -6,7 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, delete, select
 from sqlalchemy.orm import Session
-from tests.integration.conftest import REGISTER, ScriptedEngine, submit_text
+from tests.integration.conftest import (
+    REGISTER,
+    ScriptedEngine,
+    submit_and_correction,
+)
 
 from argumenta.adapters.db.models import (
     Chapter,
@@ -227,7 +231,6 @@ def _play(client: TestClient, db_engine: Engine, chapter_id: uuid.UUID) -> str:
     assert chapter.status_code == 200, chapter.text
     scene = chapter.json()
     body = " ".join(["palavra"] * (scene["min_words"] + 10))
-    response = submit_text(client, chapter_id, body)
-    assert response.status_code == 201, response.text
-    assert response.json()["verdict"] == "approved"
+    state = submit_and_correction(client, chapter_id, body)
+    assert state["result"]["verdict"] == "approved"
     return str(scene["title"])

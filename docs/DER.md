@@ -1,8 +1,16 @@
 # DER: Argumenta
 
-Versão 0.9, 2026-08-22. Modelo de dados do MVP em Postgres, derivado das decisões do
+Versão 0.10, 2026-08-29. Modelo de dados do MVP em Postgres, derivado das decisões do
 [PRD](./PRD.md). Identificadores em inglês, snake_case; chaves primárias `uuid`
 (`gen_random_uuid()`); todo timestamp é `timestamptz`; extensões: `pgcrypto`, `citext`.
+
+Mudanças da v0.10 (issue 68): `submissions.status` (`submission_status`:
+`evaluating`, `evaluated`, `failed`), o ciclo de vida da correção assíncrona. O
+`POST` grava `evaluating` e responde 202; o worker grava a `evaluation` e vira o
+status para `evaluated`; uma falha vira `failed`, que é recuperável (o aluno
+reenvia e o tique do limite diário é devolvido). Backfill: default `evaluated`,
+porque toda linha anterior à mudança já carrega sua avaliação (o envio síncrono
+que estourava o timeout revertia a transação inteira).
 
 Mudanças da v0.9 (issue 14): nenhuma coluna nova. O expurgo LGPD ganhou forma:
 `DELETE /me` marca `users.deleted_at` e aposenta `auth_identities` e
@@ -270,6 +278,7 @@ erDiagram
     uuid user_id FK
     uuid chapter_id FK
     smallint attempt_number "unico por user e chapter"
+    submission_status status "evaluating, evaluated ou failed"
     submission_context context "main ou recovery"
     text body
     smallint word_count
@@ -455,6 +464,7 @@ Notas:
 | `branch` | `main`, `consequence`, `recovery` | `chapter_beats.branch` |
 | `beat_type` | `narration`, `dialogue`, `objective`, `hint` | `chapter_beats.beat_type` |
 | `submission_context` | `main`, `recovery` | `submissions.context` |
+| `submission_status` | `evaluating`, `evaluated`, `failed` | `submissions.status` |
 | `verdict` | `approved`, `failed_technical`, `failed_persuasion` | `evaluations.verdict` |
 | `dimension` | `norma_culta`, `coesao`, `coerencia`, `repertorio`, `persuasao`, `proposta_intervencao` | `evaluation_scores.dimension` |
 | `annotation_type` | `spelling`, `accentuation`, `punctuation`, `grammar`, `cohesion`, `coherence`, `repertoire_alert`, `repertoire_praise`, `persuasion` | `evaluation_annotations.type` |

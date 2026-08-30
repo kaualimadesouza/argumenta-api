@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Iterator
+from datetime import timedelta
 from functools import lru_cache
 from typing import Annotated
 
@@ -28,6 +29,10 @@ from argumenta.adapters.db.repositories.track import (
     SqlAlchemyProgressRepository,
 )
 from argumenta.adapters.db.session import get_session_factory
+from argumenta.adapters.dispatch import (
+    InlineEvaluationDispatcher,
+    LambdaEvaluationDispatcher,
+)
 from argumenta.adapters.google.oauth import HttpGoogleIdentityGateway
 from argumenta.adapters.llm.evaluation_engine import LlmEvaluationEngine
 from argumenta.adapters.llm.factory import build_provider
@@ -39,7 +44,12 @@ from argumenta.adapters.spelling.spylls_checker import SpyllsSpellChecker
 from argumenta.application.accounts.ports import GoogleIdentityGateway
 from argumenta.application.evaluation.ports import EvaluationEngine
 from argumenta.application.evaluation.use_cases import EvaluateArgumentUseCase
-from argumenta.application.gameplay.use_cases import SubmitArgumentUseCase
+from argumenta.application.gameplay.ports import EvaluationDispatcher
+from argumenta.application.gameplay.use_cases import (
+    EvaluateSubmissionUseCase,
+    GetSubmissionUseCase,
+    SubmitArgumentUseCase,
+)
 from argumenta.application.ports import RateLimiter
 from argumenta.application.reactions.ports import ReactionEngine
 from argumenta.application.reactions.use_cases import GetCharacterReactionUseCase
@@ -259,7 +269,7 @@ def get_character_reaction_use_case(
     return GetCharacterReactionUseCase(reactions, content, engine, budget)
 
 
-def get_submit_argument_use_case(
+def get_evaluate_submission_use_case(
     contexts: Annotated[
         SqlAlchemyEvaluationContextRepository, Depends(get_evaluation_context_repository)
     ],
@@ -269,8 +279,48 @@ def get_submit_argument_use_case(
     drafts: Annotated[SqlAlchemyDraftRepository, Depends(get_draft_repository)],
     evaluate: Annotated[EvaluateArgumentUseCase, Depends(get_evaluate_argument_use_case)],
     exams: Annotated[SqlAlchemyExamTargetRepository, Depends(get_exam_target_repository)],
+) -> EvaluateSubmissionUseCase:
+    """The worker use case, request-wired only for the inline dispatcher; on
+    Lambda the worker execution assembles its own (entrypoints.evaluation_worker)."""
+    return EvaluateSubmissionUseCase(
+        contexts, submissions, progress, activity, drafts, evaluate, exams
+    )
+
+
+def get_evaluation_dispatcher(
+    session: DbSession,
+    evaluate_submission: Annotated[
+        EvaluateSubmissionUseCase, Depends(get_evaluate_submission_use_case)
+    ],
+) -> EvaluationDispatcher:
+    settings = get_settings()
+    if settings.lambda_function_name:
+        return LambdaEvaluationDispatcher(session, settings.lambda_function_name)
+    return InlineEvaluationDispatcher(evaluate_submission)
+
+
+def get_submit_argument_use_case(
+    contexts: Annotated[
+        SqlAlchemyEvaluationContextRepository, Depends(get_evaluation_context_repository)
+    ],
+    submissions: Annotated[SqlAlchemySubmissionRepository, Depends(get_submission_repository)],
+    progress: Annotated[SqlAlchemyProgressWriter, Depends(get_progress_writer)],
+    activity: Annotated[SqlAlchemyDailyActivityWriter, Depends(get_daily_activity_writer)],
+    dispatcher: Annotated[EvaluationDispatcher, Depends(get_evaluation_dispatcher)],
 ) -> SubmitArgumentUseCase:
-    return SubmitArgumentUseCase(contexts, submissions, progress, activity, drafts, evaluate, exams)
+    return SubmitArgumentUseCase(contexts, submissions, progress, activity, dispatcher)
+
+
+def get_get_submission_use_case(
+    submissions: Annotated[SqlAlchemySubmissionRepository, Depends(get_submission_repository)],
+    progress: Annotated[SqlAlchemyProgressWriter, Depends(get_progress_writer)],
+) -> GetSubmissionUseCase:
+    settings = get_settings()
+    return GetSubmissionUseCase(
+        submissions,
+        progress,
+        stale_after=timedelta(seconds=settings.evaluation_stale_after_seconds),
+    )
 
 
 def get_telemetry_repository(session: DbSession) -> SqlAlchemyTelemetryRepository:

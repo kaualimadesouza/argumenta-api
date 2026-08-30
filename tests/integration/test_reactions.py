@@ -123,7 +123,7 @@ def _submission_id(
 ) -> str:
     engine.scripted = profile
     response = submit_text(client, chapter_id)
-    assert response.status_code == 201
+    assert response.status_code == 202
     return str(response.json()["submission_id"])
 
 

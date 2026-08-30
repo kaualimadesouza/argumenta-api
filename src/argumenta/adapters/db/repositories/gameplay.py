@@ -17,10 +17,21 @@ from argumenta.adapters.db.models import (
     Story,
     Submission,
 )
-from argumenta.application.gameplay.ports import NewSubmission, StoredEvaluation
-from argumenta.domain.enums import ChapterStatus
+from argumenta.adapters.observability import metrics as obs_metrics
+from argumenta.application.gameplay.ports import (
+    NewSubmission,
+    PendingSubmission,
+    StoredCorrection,
+    SubmissionRecord,
+)
+from argumenta.domain.enums import ChapterStatus, SubmissionStatus
 from argumenta.domain.errors import DailyLimitReachedError
-from argumenta.domain.evaluation import EvaluationOutcome, EvaluationRuler
+from argumenta.domain.evaluation import (
+    Annotation,
+    EvaluationOutcome,
+    EvaluationRuler,
+    ScoredDimension,
+)
 from argumenta.domain.lenses import LensView
 from argumenta.domain.submission import ChapterEvaluationContext
 from argumenta.domain.track import ChapterContent
@@ -66,13 +77,7 @@ class SqlAlchemySubmissionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def store(
-        self,
-        submission: NewSubmission,
-        outcome: EvaluationOutcome,
-        ruler: EvaluationRuler,
-        lens: LensView,
-    ) -> StoredEvaluation:
+    def create_pending(self, submission: NewSubmission) -> PendingSubmission:
         attempt_number = self._session.execute(
             select(func.coalesce(func.max(Submission.attempt_number), 0) + 1).where(
                 Submission.user_id == submission.user_id,
@@ -84,6 +89,7 @@ class SqlAlchemySubmissionRepository:
             user_id=submission.user_id,
             chapter_id=submission.chapter_id,
             attempt_number=attempt_number,
+            status=SubmissionStatus.EVALUATING,
             context=submission.context,
             body=submission.body,
             word_count=submission.word_count,
@@ -92,9 +98,50 @@ class SqlAlchemySubmissionRepository:
         )
         self._session.add(row)
         self._session.flush()
+        return PendingSubmission(submission_id=row.id, attempt_number=attempt_number)
 
-        evaluation = Evaluation(
+    def get_record(self, submission_id: uuid.UUID) -> SubmissionRecord | None:
+        row = self._session.scalar(
+            select(Submission).where(
+                Submission.id == submission_id,
+                Submission.deleted_at.is_(None),
+            )
+        )
+        return None if row is None else self._record(row)
+
+    def get_record_for(
+        self, user_id: uuid.UUID, submission_id: uuid.UUID
+    ) -> SubmissionRecord | None:
+        row = self._session.scalar(
+            select(Submission).where(
+                Submission.id == submission_id,
+                Submission.user_id == user_id,
+                Submission.deleted_at.is_(None),
+            )
+        )
+        return None if row is None else self._record(row)
+
+    @staticmethod
+    def _record(row: Submission) -> SubmissionRecord:
+        return SubmissionRecord(
             submission_id=row.id,
+            user_id=row.user_id,
+            chapter_id=row.chapter_id,
+            body=row.body,
+            status=row.status,
+            attempt_number=row.attempt_number,
+            submitted_at=row.created_at,
+        )
+
+    def store_evaluation(
+        self,
+        submission_id: uuid.UUID,
+        outcome: EvaluationOutcome,
+        ruler: EvaluationRuler,
+        lens: LensView,
+    ) -> uuid.UUID:
+        evaluation = Evaluation(
+            submission_id=submission_id,
             is_current=True,
             verdict=outcome.verdict,
             average_score=outcome.average_score,
@@ -134,11 +181,80 @@ class SqlAlchemySubmissionRepository:
                     priority=annotation.priority,
                 )
             )
+        self._set_status(submission_id, SubmissionStatus.EVALUATED)
         self._session.flush()
-        return StoredEvaluation(
-            submission_id=row.id,
-            evaluation_id=evaluation.id,
-            attempt_number=attempt_number,
+        # issue #51 dashboard counter, recorded where the verdict actually
+        # lands now that grading is async (issue #68)
+        obs_metrics.submissions_counter.add(1, {"verdict": outcome.verdict.value})
+        return evaluation.id
+
+    def mark_failed(self, submission_id: uuid.UUID) -> None:
+        self._set_status(submission_id, SubmissionStatus.FAILED)
+        self._session.flush()
+
+    def _set_status(self, submission_id: uuid.UUID, status: SubmissionStatus) -> None:
+        self._session.execute(
+            update(Submission)
+            .where(Submission.id == submission_id, Submission.deleted_at.is_(None))
+            .values(status=status)
+        )
+
+    def get_correction(self, submission_id: uuid.UUID) -> StoredCorrection | None:
+        row = self._session.execute(
+            select(Evaluation, Chapter.kind)
+            .join(Submission, Evaluation.submission_id == Submission.id)
+            .join(Chapter, Submission.chapter_id == Chapter.id)
+            .where(
+                Evaluation.submission_id == submission_id,
+                Evaluation.is_current.is_(True),
+                Evaluation.deleted_at.is_(None),
+            )
+        ).first()
+        if row is None:
+            return None
+        evaluation, chapter_kind = row
+        scores = tuple(
+            ScoredDimension(
+                dimension=score.dimension,
+                score=score.score,
+                evidence=score.evidence,
+                passed_floor=score.passed_floor,
+            )
+            for score in self._session.scalars(
+                select(EvaluationScore).where(
+                    EvaluationScore.evaluation_id == evaluation.id,
+                    EvaluationScore.deleted_at.is_(None),
+                )
+            )
+        )
+        annotations = tuple(
+            Annotation(
+                span_start=annotation.span_start,
+                span_end=annotation.span_end,
+                type=annotation.type,
+                severity=annotation.severity,
+                message=annotation.message,
+                suggestion=annotation.suggestion,
+                priority=annotation.priority,
+            )
+            for annotation in self._session.scalars(
+                select(EvaluationAnnotation)
+                .where(
+                    EvaluationAnnotation.evaluation_id == evaluation.id,
+                    EvaluationAnnotation.deleted_at.is_(None),
+                )
+                .order_by(EvaluationAnnotation.span_start, EvaluationAnnotation.span_end)
+            )
+        )
+        return StoredCorrection(
+            verdict=evaluation.verdict,
+            average_score=float(evaluation.average_score),
+            floor_value=evaluation.floor_value,
+            min_average=evaluation.min_average,
+            scores=scores,
+            annotations=annotations,
+            exam=evaluation.exam,
+            chapter_kind=chapter_kind,
         )
 
 
@@ -225,6 +341,18 @@ class SqlAlchemyDailyActivityWriter:
                 DailyActivity.activity_date == day,
             )
             .values(approved_count=DailyActivity.approved_count + 1)
+        )
+        self._session.flush()
+
+    def withdraw_submission(self, user_id: uuid.UUID, day: date) -> None:
+        self._session.execute(
+            update(DailyActivity)
+            .where(
+                DailyActivity.user_id == user_id,
+                DailyActivity.activity_date == day,
+                DailyActivity.submissions_count > 0,
+            )
+            .values(submissions_count=DailyActivity.submissions_count - 1)
         )
         self._session.flush()
 
