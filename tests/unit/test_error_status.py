@@ -9,8 +9,8 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from tests.otel_helpers import counter_points, point_attributes
 
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain import errors
-from argumenta.entrypoints import rest_application
 from argumenta.entrypoints.rest_application import ERROR_STATUS, create_app
 
 
@@ -67,7 +67,7 @@ def test_a_5xx_domain_error_increments_the_failures_counter(
         .get_meter("test")
         .create_counter("argumenta.evaluation.failures")
     )
-    monkeypatch.setattr(rest_application, "_evaluation_failures", counter)
+    monkeypatch.setattr(obs_metrics, "evaluation_failures", counter)
     app = create_app()
 
     @app.get("/boom-metric")

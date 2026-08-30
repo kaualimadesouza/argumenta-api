@@ -1,5 +1,3 @@
-from opentelemetry import metrics
-
 from argumenta.adapters.llm.effort import Effort
 from argumenta.adapters.llm.prompts.reaction_v1 import (
     CONVINCED_INSTRUCTION,
@@ -10,15 +8,9 @@ from argumenta.adapters.llm.prompts.reaction_v1 import (
 )
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
 from argumenta.adapters.llm.provider import LlmCall, LlmProvider
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.reactions.ports import ReactionRequest, ReactionText
 from argumenta.domain.enums import Verdict
-
-_meter = metrics.get_meter(__name__)
-_tokens_counter = _meter.create_counter(
-    "argumenta.llm.tokens",
-    unit="{token}",
-    description="LLM tokens spent, by engine and direction",
-)
 
 
 class LlmReactionEngine:
@@ -54,10 +46,10 @@ class LlmReactionEngine:
                 effort=self._effort,
             )
         )
-        _tokens_counter.add(
+        obs_metrics.tokens_counter.add(
             reply.usage.input_tokens or 0, {"engine": "reaction", "direction": "input"}
         )
-        _tokens_counter.add(
+        obs_metrics.tokens_counter.add(
             reply.usage.output_tokens or 0, {"engine": "reaction", "direction": "output"}
         )
         return ReactionText(

@@ -3,10 +3,10 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from mangum import Mangum
-from opentelemetry import metrics
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from argumenta import __version__
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.adapters.observability.logging import configure_logging
 from argumenta.adapters.observability.telemetry import configure_telemetry
 from argumenta.domain import errors
@@ -23,11 +23,6 @@ from argumenta.presentation.fastapi.track import router as track_router
 from argumenta.settings import get_settings
 
 _logger = logging.getLogger(__name__)
-_meter = metrics.get_meter(__name__)
-_evaluation_failures = _meter.create_counter(
-    "argumenta.evaluation.failures",
-    description="5xx domain errors, by exception type",
-)
 
 ERROR_STATUS: dict[type[errors.DomainError], int] = {
     errors.EmailAlreadyRegisteredError: 409,
@@ -73,7 +68,7 @@ def create_app() -> FastAPI:
             # the response hides the message from the student on purpose; the
             # log is the only place the real cause survives
             _logger.error("%s: %s", type(exc).__name__, exc)
-            _evaluation_failures.add(1, {"error_type": type(exc).__name__})
+            obs_metrics.evaluation_failures.add(1, {"error_type": type(exc).__name__})
         return JSONResponse(status_code=status_code, content={"detail": type(exc).__name__})
 
     return app

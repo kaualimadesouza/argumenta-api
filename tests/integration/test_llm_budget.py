@@ -16,8 +16,8 @@ from argumenta.adapters.db.models import (
     Submission,
     User,
 )
-from argumenta.adapters.db.repositories import llm_budget as llm_budget_module
 from argumenta.adapters.db.repositories.llm_budget import SqlLlmBudget
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain.enums import (
     ChapterKind,
     ContentStatus,
@@ -121,7 +121,7 @@ def test_the_check_records_the_used_ratio_as_a_metric(
         .get_meter("test")
         .create_histogram("argumenta.llm.budget_used_ratio")
     )
-    monkeypatch.setattr(llm_budget_module, "_budget_used_ratio", histogram)
+    monkeypatch.setattr(obs_metrics, "budget_used_ratio", histogram)
     with Session(db_engine) as session:
         _seed_evaluation(session, input_tokens=500, output_tokens=0)
         SqlLlmBudget(session, monthly_token_budget=1000).ensure_within_budget()

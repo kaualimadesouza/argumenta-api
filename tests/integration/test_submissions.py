@@ -23,8 +23,8 @@ from argumenta.adapters.db.models import (
     Evaluation,
     Submission,
 )
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain.enums import ChapterStatus
-from argumenta.presentation.fastapi import submissions as submissions_module
 
 
 class TestStateTransitions:
@@ -264,7 +264,7 @@ class TestSubmissionTelemetry:
             .get_meter("test")
             .create_counter("argumenta.submissions")
         )
-        monkeypatch.setattr(submissions_module, "_submissions_counter", counter)
+        monkeypatch.setattr(obs_metrics, "submissions_counter", counter)
 
         response = _submit(client, chapter_id)
 

@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Any
 
-from opentelemetry import metrics, trace
+from opentelemetry import trace
 from pydantic import BaseModel, Field, ValidationError
 
 from argumenta.adapters.llm.effort import Effort
@@ -15,6 +15,7 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import (
 )
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
 from argumenta.adapters.llm.provider import LlmProvider, StructuredCall
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.evaluation.ports import EngineRequest, EngineResult
 from argumenta.domain.enums import AnnotationType, Dimension, Severity
 from argumenta.domain.errors import EvaluationFailedError
@@ -46,17 +47,6 @@ class EvaluationOutput(BaseModel):
 
 _logger = logging.getLogger(__name__)
 _tracer = trace.get_tracer(__name__)
-_meter = metrics.get_meter(__name__)
-_latency_histogram = _meter.create_histogram(
-    "argumenta.evaluation.latency",
-    unit="ms",
-    description="Duration of the graded-correction LLM call",
-)
-_tokens_counter = _meter.create_counter(
-    "argumenta.llm.tokens",
-    unit="{token}",
-    description="LLM tokens spent, by engine and direction",
-)
 
 _TOOL_NAME = "report_evaluation"
 _TOOL_DESCRIPTION = "Report the structured evaluation of the student's text."
@@ -142,11 +132,11 @@ class LlmEvaluationEngine:
             span.set_attribute("argumenta.prompt_version", PROMPT_VERSION)
             span.set_attribute("llm.usage.input_tokens", reply.usage.input_tokens or 0)
             span.set_attribute("llm.usage.output_tokens", reply.usage.output_tokens or 0)
-        _latency_histogram.record(latency_ms, {"model": reply.model})
-        _tokens_counter.add(
+        obs_metrics.evaluation_latency.record(latency_ms, {"model": reply.model})
+        obs_metrics.tokens_counter.add(
             reply.usage.input_tokens or 0, {"engine": "evaluation", "direction": "input"}
         )
-        _tokens_counter.add(
+        obs_metrics.tokens_counter.add(
             reply.usage.output_tokens or 0, {"engine": "evaluation", "direction": "output"}
         )
         output = parse_engine_output(reply.payload, request.text)

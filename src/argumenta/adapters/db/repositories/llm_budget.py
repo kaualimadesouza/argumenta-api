@@ -1,19 +1,14 @@
 import logging
 from datetime import UTC, datetime
 
-from opentelemetry import metrics
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from argumenta.adapters.db.models import CharacterReaction, Evaluation
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.domain.errors import LlmBudgetExceededError
 
 logger = logging.getLogger(__name__)
-_meter = metrics.get_meter(__name__)
-_budget_used_ratio = _meter.create_histogram(
-    "argumenta.llm.budget_used_ratio",
-    description="Fraction of the monthly LLM token budget spent, observed at each check",
-)
 
 
 class SqlLlmBudget:
@@ -52,7 +47,7 @@ class SqlLlmBudget:
         if self._budget <= 0:
             return
         spent = self._spent_this_month()
-        _budget_used_ratio.record(spent / self._budget)
+        obs_metrics.budget_used_ratio.record(spent / self._budget)
         if spent >= self._budget:
             logger.error("llm budget exhausted: %s of %s tokens this month", spent, self._budget)
             raise LlmBudgetExceededError(

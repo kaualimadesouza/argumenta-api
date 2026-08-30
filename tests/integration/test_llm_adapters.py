@@ -16,7 +16,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from tests.otel_helpers import counter_points, histogram_points, point_attributes
 
 from argumenta.adapters.llm import evaluation_engine as evaluation_engine_module
-from argumenta.adapters.llm import reaction_engine as reaction_engine_module
 from argumenta.adapters.llm.anthropic_provider import AnthropicProvider
 from argumenta.adapters.llm.contract import ensure_usable
 from argumenta.adapters.llm.evaluation_engine import LlmEvaluationEngine
@@ -24,6 +23,7 @@ from argumenta.adapters.llm.prompts.evaluation_v1 import PROMPT_VERSION as EVALU
 from argumenta.adapters.llm.prompts.student_text import defuse_fence
 from argumenta.adapters.llm.reaction_engine import LlmReactionEngine
 from argumenta.adapters.llm.usage import billed_input_tokens
+from argumenta.adapters.observability import metrics as obs_metrics
 from argumenta.application.evaluation.ports import EngineRequest
 from argumenta.application.reactions.ports import ReactionRequest
 from argumenta.domain.enums import Dimension, Verdict
@@ -425,8 +425,8 @@ class TestEvaluationTelemetry:
     ) -> None:
         fake_client(_tool_response())
         histogram, counter, reader = self._metrics()
-        monkeypatch.setattr(evaluation_engine_module, "_latency_histogram", histogram)
-        monkeypatch.setattr(evaluation_engine_module, "_tokens_counter", counter)
+        monkeypatch.setattr(obs_metrics, "evaluation_latency", histogram)
+        monkeypatch.setattr(obs_metrics, "tokens_counter", counter)
 
         _evaluation().evaluate(_engine_request())
 
@@ -445,8 +445,8 @@ class TestEvaluationTelemetry:
     ) -> None:
         fake_client(_tool_response())
         histogram, counter, reader = self._metrics()
-        monkeypatch.setattr(evaluation_engine_module, "_latency_histogram", histogram)
-        monkeypatch.setattr(evaluation_engine_module, "_tokens_counter", counter)
+        monkeypatch.setattr(obs_metrics, "evaluation_latency", histogram)
+        monkeypatch.setattr(obs_metrics, "tokens_counter", counter)
 
         _evaluation().evaluate(_engine_request())
 
@@ -466,7 +466,7 @@ class TestReactionTelemetry:
             .get_meter("test")
             .create_counter("argumenta.llm.tokens")
         )
-        monkeypatch.setattr(reaction_engine_module, "_tokens_counter", counter)
+        monkeypatch.setattr(obs_metrics, "tokens_counter", counter)
 
         _reaction().generate(_reaction_request())
 
