@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/kaualimadesouza/argumenta-api/compare/v0.1.0...v0.2.0) (2026-08-30)
+
+
+### Features
+
+* evaluate submissions asynchronously behind a 202 + polling contract ([#70](https://github.com/kaualimadesouza/argumenta-api/issues/70)) ([22ec174](https://github.com/kaualimadesouza/argumenta-api/commit/22ec17477758c700e93910302253fac6f0b530b9))
+* instrument the API with OpenTelemetry (traces, metrics, structured logs) ([#64](https://github.com/kaualimadesouza/argumenta-api/issues/64)) ([e97423a](https://github.com/kaualimadesouza/argumenta-api/commit/e97423a0862d6f5d9471efc9d3ece74271ff8fa0))
+
 ## 0.1.0 (2026-08-29)
 
 
