@@ -47,6 +47,7 @@ from argumenta.application.evaluation.use_cases import EvaluateArgumentUseCase
 from argumenta.application.gameplay.ports import EvaluationDispatcher
 from argumenta.application.gameplay.use_cases import (
     EvaluateSubmissionUseCase,
+    GetSubmissionHistoryUseCase,
     GetSubmissionUseCase,
     SubmitArgumentUseCase,
 )
@@ -341,3 +342,9 @@ def get_record_telemetry_use_case(
     limiter: Annotated[RateLimiter, Depends(get_telemetry_rate_limiter)],
 ) -> RecordTelemetryEventsUseCase:
     return RecordTelemetryEventsUseCase(events, limiter)
+
+
+def get_get_submission_history_use_case(
+    submissions: Annotated[SqlAlchemySubmissionRepository, Depends(get_submission_repository)],
+) -> GetSubmissionHistoryUseCase:
+    return GetSubmissionHistoryUseCase(submissions)

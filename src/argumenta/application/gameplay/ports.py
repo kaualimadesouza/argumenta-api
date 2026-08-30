@@ -66,6 +66,21 @@ class StoredCorrection:
     chapter_kind: ChapterKind
 
 
+@dataclass(frozen=True)
+class PastAttempt:
+    submission_id: uuid.UUID
+    attempt_number: int
+    body: str
+    verdict: Verdict
+    average_score: float
+    floor_value: int
+    min_average: int
+    scores: tuple[ScoredDimension, ...]
+    exam: Exam | None
+    chapter_kind: ChapterKind
+    submitted_at: datetime
+
+
 class EvaluationContextRepository(Protocol):
     def get_context(self, chapter_id: uuid.UUID) -> ChapterEvaluationContext | None: ...
 
@@ -78,6 +93,10 @@ class ActiveExamReader(Protocol):
 
 
 class SubmissionRepository(Protocol):
+    def list_attempts(self, user_id: uuid.UUID, chapter_id: uuid.UUID) -> tuple[PastAttempt, ...]:
+        """All evaluated attempts for the chapter, newest first."""
+        ...
+
     def create_pending(self, submission: NewSubmission) -> PendingSubmission:
         """Persists the submission with status=evaluating; attempt_number is the
         next one for the user/chapter pair."""
