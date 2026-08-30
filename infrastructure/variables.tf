@@ -62,3 +62,16 @@ variable "argumenta_jwt_secret" {
   type      = string
   sensitive = true
 }
+
+variable "otel_exporter_otlp_endpoint" {
+  description = "OpenTelemetry OTLP endpoint (e.g. https://ingest.us.signoz.cloud:443)"
+  type        = string
+  default     = ""
+}
+
+variable "otel_exporter_otlp_headers" {
+  description = "OpenTelemetry OTLP headers"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

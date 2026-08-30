@@ -137,6 +137,8 @@ jobs:
           TF_VAR_argumenta_llm_vendor: ${{ vars.ARGUMENTA_LLM_VENDOR || 'anthropic' }}
           TF_VAR_argumenta_evaluation_model: ${{ vars.ARGUMENTA_EVALUATION_MODEL || 'claude-sonnet-5' }}
           TF_VAR_argumenta_reaction_model: ${{ vars.ARGUMENTA_REACTION_MODEL || 'claude-haiku-4-5' }}
+          TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+          TF_VAR_otel_exporter_otlp_headers: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }} # pragma: allowlist secret
         run: terraform apply -auto-approve -input=false
 
   notify:

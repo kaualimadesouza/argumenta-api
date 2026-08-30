@@ -43,6 +43,8 @@ resource "aws_lambda_function" "api" {
       ARGUMENTA_LLM_VENDOR           = var.argumenta_llm_vendor
       ARGUMENTA_EVALUATION_MODEL     = var.argumenta_evaluation_model
       ARGUMENTA_REACTION_MODEL       = var.argumenta_reaction_model
+      OTEL_EXPORTER_OTLP_ENDPOINT    = var.otel_exporter_otlp_endpoint
+      OTEL_EXPORTER_OTLP_HEADERS     = var.otel_exporter_otlp_headers
     }
   }
 }
